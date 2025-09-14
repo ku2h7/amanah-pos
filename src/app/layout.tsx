@@ -3,6 +3,7 @@ import { MainNav } from "@/components/main-nav"
 import { Inter } from 'next/font/google';
 import { Toaster } from "sonner"
 import "./globals.css";
+import { AuthProvider } from "@/contexts/auth-context";
 
 const inter = Inter({ 
   subsets: ["latin"],
@@ -29,15 +30,17 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <div className="min-h-screen flex flex-col">
-            <MainNav />
-            <main className="flex-1">
-              <div className="flex-1 space-y-4 p-8 pt-6">
-                {children}
-              </div>
-            </main>
-            <Toaster position="top-right" richColors closeButton />
-          </div>
+          <AuthProvider>
+            <div className="min-h-screen flex flex-col">
+              <MainNav />
+              <main className="flex-1">
+                <div className="flex-1 space-y-4 p-8 pt-6">
+                  {children}
+                </div>
+              </main>
+              <Toaster position="bottom-center" richColors closeButton />
+            </div>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>
