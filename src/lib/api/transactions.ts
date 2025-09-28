@@ -15,6 +15,8 @@ export interface CreateTransactionPayload {
   customer_name: string;
   amount_paid: number;
   items: TransactionItemPayload[];
+  cashier_id?: string;
+  cashier_name?: string;
 }
 
 export const createTransaction = async (payload: CreateTransactionPayload) => {
@@ -62,12 +64,28 @@ export const getTransactions = async (params?: {
 };
 
 export const getTransactionById = async (id: string) => {
-  const response = await fetch(`/api/transactions/${id}`);
+  try {
+    const response = await fetch(`/api/transactions/${id}`);
+    const data = await response.json().catch(() => ({}));
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to fetch transaction');
+    if (!response.ok) {
+      console.error('Transaction API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        url: response.url,
+        error: data
+      });
+      
+      throw new Error(
+        data.error || 
+        data.message || 
+        `Gagal mengambil detail transaksi (${response.status} ${response.statusText})`
+      );
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in getTransactionById:', error);
+    throw new Error(error instanceof Error ? error.message : 'Terjadi kesalahan saat mengambil data transaksi');
   }
-
-  return response.json();
 };

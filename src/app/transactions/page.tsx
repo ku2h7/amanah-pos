@@ -1,135 +1,148 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShoppingCart } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { ShoppingCart, Loader2, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useEffect, useState } from "react";
 import { Database } from "@/lib/database.types";
-
-// Define the shape of the product data from the database
-interface Product {
-  id: string;
-  name: string;
-  qty: number;
-  cost_price: number;
-  box_price: number;
-  qty_per_box: number;
-  retail_price: number;
-  retail_box_price: number;
-  wholesale_price: number;
-  min_wholesale_qty: number;
-  barcode: string | null;
-  exp_date: string | null;
-  is_editable: boolean;
-  created_at: string;
-}
+import { format } from 'date-fns';
+import { id } from 'date-fns/locale';
 
 // Define the shape of transaction items
 interface TransactionItem {
   id: string;
+  created_at: string;
   transaction_id: string;
   product_id: string;
   quantity: number;
   price: number;
   subtotal: number;
-  product: Product | null;
-  created_at: string;
+  products?: {
+    id: string;
+    name: string;
+    barcode: string | null;
+  } | null;
 }
 
 // Define the shape of a transaction
 interface Transaction {
-  id: string;
+  id: string;  // This is now the transaction_number (e.g., 'TXN-001')
   created_at: string;
   updated_at: string | null;
   customer_name: string;
   total_amount: number;
+  change_amount: number;
+  is_paid: boolean;
   notes: string | null;
-  items: TransactionItem[];
-  cashier_id: string;  // ID kasir yang melakukan transaksi
-  is_paid: boolean;    // Status pembayaran (lunas/belum)
+  transaction_items: TransactionItem[];
+}
+
+interface ExpandedTransactions {
+  [key: string]: boolean;
 }
 
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedTransactions, setExpandedTransactions] = useState<ExpandedTransactions>({});
   const supabase = createClientComponentClient<Database>();
+
+  const toggleTransactionItems = (transactionId: string) => {
+    setExpandedTransactions(prev => ({
+      ...prev,
+      [transactionId]: !prev[transactionId]
+    }));
+  };
 
   useEffect(() => {
     const fetchTransactions = async () => {
       try {
         setLoading(true);
-        const { data, error } = await supabase
+        setError(null);
+        
+        // Check auth session
+        console.log('Checking auth session...');
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        console.log('Auth session:', { session, sessionError });
+        
+        if (sessionError) {
+          console.error('Auth session error:', sessionError);
+          throw new Error(`Gagal memeriksa sesi: ${sessionError.message}`);
+        }
+        
+        // Fetch transactions with their items and product details in a single query
+        console.log('Fetching transactions with items and products...');
+        const { data: transactionsData, error: transactionsError } = await supabase
           .from('transactions')
           .select(`
-            id,
-            created_at,
-            updated_at,
-            customer_name,
-            total_amount,
-            notes,
-            cashier_id,
-            is_paid,
-            items:transaction_items(
-              id,
-              created_at,
-              transaction_id,
-              product_id,
-              quantity,
-              price,
-              subtotal,
-              product:products(
+            *,
+            transaction_items(
+              *,
+              products(
                 id,
-                created_at,
                 name,
-                qty,
-                cost_price,
-                box_price,
-                qty_per_box,
-                retail_price,
-                retail_box_price,
-                wholesale_price,
-                min_wholesale_qty,
-                barcode,
-                exp_date,
-                is_editable
+                barcode
               )
             )
           `)
           .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        console.log('Transactions query result:', { transactionsData, transactionsError });
         
-        // Transform the data to match our Transaction type
-        const typedData: Transaction[] = (data as any[] || []).map(tx => ({
-          ...tx,
-          items: (tx.items || []).map((item: any) => ({
+        if (transactionsError) {
+          console.error('Transactions query error:', transactionsError);
+          throw transactionsError;
+        }
+        
+        if (!transactionsData) {
+          console.log('No transactions data received');
+          setTransactions([]);
+          return;
+        }
+
+        // Process the transactions data
+        const processedTransactions: Transaction[] = transactionsData.map(transaction => ({
+          ...transaction,
+          transaction_items: (transaction.transaction_items || []).map((item: any) => ({
             ...item,
-            product: item.product ? {
-              id: item.product.id,
-              name: item.product.name,
-              qty: item.product.qty,
-              cost_price: item.product.cost_price,
-              box_price: item.product.box_price,
-              qty_per_box: item.product.qty_per_box,
-              retail_price: item.product.retail_price,
-              retail_box_price: item.product.retail_box_price,
-              wholesale_price: item.product.wholesale_price,
-              min_wholesale_qty: item.product.min_wholesale_qty,
-              barcode: item.product.barcode,
-              exp_date: item.product.exp_date,
-              is_editable: item.product.is_editable,
-              created_at: item.product.created_at
+            products: item.products ? {
+              id: item.products.id,
+              name: item.products.name,
+              barcode: item.products.barcode
             } : null
           }))
         }));
         
-        setTransactions(typedData);
-      } catch (err) {
-        console.error('Error fetching transactions:', err);
-        setError('Gagal memuat data transaksi. Silakan coba lagi nanti.');
+        console.log('Processed transactions data:', processedTransactions);
+        setTransactions(processedTransactions);
+        setFilteredTransactions(processedTransactions);
+      } catch (err: any) {
+        console.error('Error in fetchTransactions:', {
+          error: err,
+          message: err?.message,
+          code: err?.code,
+          details: err?.details,
+          hint: err?.hint,
+          status: err?.status
+        });
+        
+        let errorMessage = 'Terjadi kesalahan yang tidak diketahui';
+        
+        if (err?.message) {
+          errorMessage = err.message;
+        } else if (err?.details) {
+          errorMessage = err.details;
+        } else if (err?.hint) {
+          errorMessage = err.hint;
+        }
+        
+        setError(`Gagal memuat data transaksi: ${errorMessage}`);
       } finally {
         setLoading(false);
       }
@@ -140,88 +153,187 @@ export default function TransactionsPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto py-6">
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-        </div>
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
 
+  // Filter transactions based on search term
+  const handleSearch = (term: string) => {
+    setSearchTerm(term);
+    if (!term.trim()) {
+      setFilteredTransactions(transactions);
+      return;
+    }
+
+    const results = transactions.filter(transaction => 
+      transaction.transaction_items.some(item => 
+        item.products?.name.toLowerCase().includes(term.toLowerCase()) ||
+        item.products?.barcode?.toLowerCase().includes(term.toLowerCase())
+      )
+    );
+    setFilteredTransactions(results);
+  };
+
   if (error) {
     return (
-      <div className="container mx-auto py-6">
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
-          <strong className="font-bold">Error! </strong>
-          <span className="block sm:inline">{error}</span>
-        </div>
+      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+        {error}
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Daftar Transaksi</h1>
-        <Link href="/transactions/new">
-          <Button>
-            <ShoppingCart className="mr-2 h-4 w-4" />
-            Transaksi Baru
+    <div className="container mx-auto p-4">
+      <div className="flex flex-col space-y-4 mb-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold">Daftar Transaksi</h1>
+          <Button asChild>
+            <Link href="/transactions/new">
+              <ShoppingCart className="mr-2 h-4 w-4" />
+              Transaksi Baru
+            </Link>
           </Button>
-        </Link>
+        </div>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Cari produk (contoh: Le Mineral)"
+            className="pl-10 w-full md:w-1/3"
+            value={searchTerm}
+            onChange={(e) => handleSearch(e.target.value)}
+          />
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Transaction History</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border [&>div:not(:last-child)]:border-b">
-            {transactions.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground">
-                Belum ada transaksi yang tercatat.
-              </div>
-            ) : (
-              transactions.map((transaction) => (
-              <div key={transaction.id} className="p-4 flex justify-between items-center">
-                <div>
-                  <h3 className="font-medium">
-                    <Link href={`/transactions/${transaction.id}`} className="hover:underline">
-                      Transaksi #{transaction.id.slice(0, 8)}
-                    </Link>
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {new Date(transaction.created_at).toLocaleDateString('id-ID')} • 
-                    {transaction.customer_name} • 
-                    {transaction.items.reduce((total, item) => total + item.quantity, 0)} item
-                  </p>
-                  <div className="mt-2 space-y-1">
-                    {transaction.items.map((item) => (
-                      <div key={item.id} className="text-xs text-muted-foreground">
-                        {item.quantity}x {item.product?.name || 'Produk tidak ditemukan'} @ Rp{item.price.toLocaleString('id-ID')}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="space-x-2">
-                  <span className="font-medium">
-                    Rp{transaction.total_amount?.toLocaleString('id-ID') || '0'}
-                    <span className={`text-xs block ${transaction.is_paid ? 'text-green-500' : 'text-amber-500'}`}>
-                      {transaction.is_paid ? 'Lunas' : 'Belum Lunas'}
-                    </span>
-                  </span>
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href={`/transactions/${transaction.id}`}>
-                      Detail
-                    </Link>
-                  </Button>
-                </div>
-              </div>
-            ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      {filteredTransactions.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <ShoppingCart className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium mb-2">Belum ada transaksi</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Mulai dengan membuat transaksi baru
+            </p>
+            <Button asChild>
+              <Link href="/transactions/new">
+                <ShoppingCart className="mr-2 h-4 w-4" />
+                Transaksi Baru
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-4">Tanggal</th>
+                    <th className="text-left p-4">No. Transaksi</th>
+                    <th className="text-left p-4">Pelanggan</th>
+                    <th className="text-left p-4">Produk</th>
+                    <th className="text-right p-4">Total</th>
+                    <th className="text-right p-4">Kembalian</th>
+                    <th className="text-right p-4">Status</th>
+                    <th className="text-right p-4">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTransactions.map((transaction) => {
+                    const itemCount = transaction.transaction_items?.reduce(
+                      (total, item) => total + item.quantity, 0
+                    ) || 0;
+                    
+                    return (
+                      <tr key={transaction.id} className="border-b hover:bg-muted/50">
+                        <td className="p-4">
+                          {format(new Date(transaction.created_at), 'dd/MM/yyyy HH:mm', { locale: id })}
+                        </td>
+                        <td className="p-4">
+                          <div className="font-medium">
+                            <Link
+                              href={`/transactions/${transaction.id}`}
+                              className="text-primary hover:underline"
+                            >
+                              {transaction.id}
+                            </Link>
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {itemCount} item{itemCount !== 1 ? 's' : ''}
+                          </div>
+                        </td>
+                        <td className="p-4">{transaction.customer_name || '-'}</td>
+                        <td className="p-4 max-w-xs">
+                          <div className="space-y-1">
+                            {transaction.transaction_items.slice(0, expandedTransactions[transaction.id] ? transaction.transaction_items.length : 2).map((item, idx) => {
+                              const productName = item.products?.name || 'Produk tidak ditemukan';
+                              const isMatch = searchTerm && 
+                                (productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                item.products?.barcode?.toLowerCase().includes(searchTerm.toLowerCase()));
+                              
+                              return (
+                                <div key={idx} className={`text-sm ${isMatch ? 'bg-blue-200 text-gray-900 px-2 py-1 rounded' : ''}`}>
+                                  {item.quantity}x {productName}
+                                  {isMatch && (
+                                    <span className="ml-2 text-xs bg-blue-300 text-gray-900 px-1.5 py-0.5 rounded-full">
+                                      Cocok!
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                            {transaction.transaction_items.length > 2 && (
+                              <button
+                                onClick={() => toggleTransactionItems(transaction.id)}
+                                className="text-xs text-blue-600 hover:underline mt-1"
+                              >
+                                {expandedTransactions[transaction.id] ? 'Lihat lebih sedikit' : `Lihat ${transaction.transaction_items.length - 2} produk lainnya`}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-4 text-right">
+                          {new Intl.NumberFormat('id-ID', {
+                            style: 'currency',
+                            currency: 'IDR',
+                            minimumFractionDigits: 0,
+                          }).format(transaction.total_amount)}
+                        </td>
+                        <td className="p-4 text-right">
+                          {new Intl.NumberFormat('id-ID', {
+                            style: 'currency',
+                            currency: 'IDR',
+                            minimumFractionDigits: 0,
+                          }).format(transaction.change_amount)}
+                        </td>
+                        <td className="p-4 text-right">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            transaction.is_paid 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {transaction.is_paid ? 'Lunas' : 'Belum Lunas'}
+                          </span>
+                        </td>
+                        <td className="p-4 text-right">
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link href={`/transactions/${transaction.id}`}>
+                              Detail
+                            </Link>
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

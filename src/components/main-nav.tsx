@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Package2, Package, ShoppingCart, PlusCircle, List, Receipt, Plus, User, Loader2 } from 'lucide-react';
+import { Package2, Package, ShoppingCart, PlusCircle, List, Receipt, Plus, User, Loader2, Hash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -33,6 +33,30 @@ export function MainNav() {
           >
             <Plus className="mr-2 h-4 w-4" />
             Tambah Produk
+          </Link>
+          <Link
+            href="/product-codes"
+            className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary flex items-center group relative"
+          >
+            <List className="mr-2 h-4 w-4" />
+            Kode Produk
+            <span className="absolute -bottom-6 left-0 w-full h-0.5 bg-primary scale-x-0 group-hover:scale-x-100 transition-transform duration-200"></span>
+          </Link>
+          <Link
+            href="/suppliers"
+            className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary flex items-center group relative"
+          >
+            <Hash className="mr-2 h-4 w-4" />
+            Daftar Supplier
+            <span className="absolute -bottom-6 left-0 w-full h-0.5 bg-primary scale-x-0 group-hover:scale-x-100 transition-transform duration-200"></span>
+          </Link>
+          <Link
+            href="/suppliers/new"
+            className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary flex items-center group relative"
+          >
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Tambah Supplier
+            <span className="absolute -bottom-6 left-0 w-full h-0.5 bg-primary scale-x-0 group-hover:scale-x-100 transition-transform duration-200"></span>
           </Link>
           <Link
             href="/transactions"
