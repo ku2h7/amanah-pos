@@ -4,18 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Minus, Trash2, Barcode, Package, Printer, ArrowLeft } from "lucide-react";
+import { Plus, Minus, Trash2, Package, ArrowLeft } from "lucide-react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { PageHeader } from "@/components/page-header";
 import Link from "next/link";
-import { useRouter } from 'next/navigation';
 import { Database } from "@/lib/database.types";
 import { createTransaction } from "@/lib/api/transactions";
 import { toast } from "sonner";
 import { ReceiptTemplate, printReceipt } from "@/components/receipt/ReceiptTemplate";
-import { openCashDrawer } from "@/lib/printer";
 
 interface Product {
   id: string;
@@ -48,19 +46,15 @@ export default function NewTransactionPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [barcodeInput, setBarcodeInput] = useState("");
-  const [isBarcodeFocused, setIsBarcodeFocused] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [amountPaid, setAmountPaid] = useState("");
-  const [showPrintButton, setShowPrintButton] = useState(false);
   const [transactionId, setTransactionId] = useState("");
   const [triedSubmit, setTriedSubmit] = useState(false);
   const [transactionComplete, setTransactionComplete] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
   const tempRef = useRef<HTMLDivElement | null>(null);
   const [cashierName, setCashierName] = useState('Admin');
-  const [cashierId, setCashierId] = useState('');
   
-  const router = useRouter();
   const supabase = createClientComponentClient<Database>();
 
   // Reset form to initial state
@@ -71,7 +65,6 @@ export default function NewTransactionPage() {
     setBarcodeInput("");
     setSearchTerm("");
     setTransactionComplete(false);
-    setShowPrintButton(false);
     setTransactionId("");
   };
 
@@ -128,7 +121,7 @@ export default function NewTransactionPage() {
     searchTimeout.current = window.setTimeout(async () => {
       try {
         // First, get all products matching the search term
-        let query = supabase
+        const query = supabase
           .from('products')
           .select('*')
           .ilike('name', `%${searchTerm}%`);
@@ -158,89 +151,10 @@ export default function NewTransactionPage() {
         clearTimeout(searchTimeout.current);
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm, supabase]);
 
-  // Handle barcode scanning
-  useEffect(() => {
-    const fetchProductByBarcode = async (barcode: string) => {
-      try {
-        const { data: product, error } = await supabase
-          .from('products')
-          .select('*')
-          .eq('barcode', barcode)
-          .single();
-
-        if (error) throw error;
-        return product;
-      } catch (error) {
-        console.error('Error fetching product:', error);
-        return null;
-      }
-    };
-
-    const handleBarcodeScan = async (scannedBarcode: string) => {
-      const cleanBarcode = scannedBarcode.trim();
-      if (!cleanBarcode) return false;
-
-      try {
-        const product = await fetchProductByBarcode(cleanBarcode);
-        
-        if (product) {
-          addToCart(product, 'pcs');
-          toast.success(`${product.name} ditambahkan ke keranjang`);
-          return true; // Return true if product found and added to cart
-        } else {
-          toast.error('Produk tidak ditemukan');
-          return false;
-        }
-      } catch (error) {
-        console.error('Error handling barcode scan:', error);
-        toast.error('Terjadi kesalahan saat memindai barcode');
-        return false;
-      }
-    };
-
-    // Check if barcode input is complete (scanner usually sends Enter key at the end)
-    const processBarcode = async () => {
-      if (barcodeInput.includes('\n') || barcodeInput.includes('\r')) {
-        const cleanBarcode = barcodeInput.replace(/[\n\r]/g, '').trim();
-        if (cleanBarcode) {
-          const isSuccess = await handleBarcodeScan(cleanBarcode);
-          if (isSuccess) {
-            // Only clear input if scan was successful
-            setBarcodeInput('');
-          } else {
-            // Keep the barcode in input for manual editing
-            setBarcodeInput(cleanBarcode);
-          }
-          // Always focus back to input
-          const barcodeInputElement = document.getElementById('barcode') as HTMLInputElement;
-          if (barcodeInputElement) {
-            barcodeInputElement.focus();
-            // Move cursor to end of input
-            barcodeInputElement.selectionStart = barcodeInputElement.selectionEnd = barcodeInputElement.value.length;
-          }
-        }
-      }
-    };
-    
-    processBarcode();
-  }, [barcodeInput, supabase]);
-  
-
-  // Helper function to calculate price based on unit and quantity
-  const calculatePrice = (product: Product, unit: UnitType, quantity: number): number => {
-    if (unit === 'box') {
-      return product.retail_box_price;
-    } else if (unit === 'pcs' && product.min_wholesale_qty > 0) {
-      return quantity >= product.min_wholesale_qty 
-        ? product.wholesale_price 
-        : product.retail_price;
-    }
-    return product.retail_price;
-  };
-
-  const addToCart = (product: Product, unit: UnitType) => {
+  const addToCart = useCallback((product: Product, unit: UnitType) => {
     // Remove the added product from search results without triggering search
     setProducts(prevProducts => {
       const filtered = prevProducts.filter(p => p.id !== product.id);
@@ -257,45 +171,72 @@ export default function NewTransactionPage() {
         return prevCart.map((item, idx) => {
           if (idx === existingItemIndex) {
             const newQuantity = item.quantity + 1;
-            // Tetap pertahankan harga yang sudah ada (baik custom atau tidak)
             return {
               ...item,
               quantity: newQuantity,
-              subtotal: item.price * newQuantity
+              subtotal: newQuantity * (unit === 'box' ? product.retail_box_price : product.retail_price)
             };
           }
           return item;
         });
       }
 
-      // Hitung harga awal sesuai logika yang sudah ada
-      let price = product.retail_price; // Default: retail price per pcs
+      const price = unit === 'box' ? product.retail_box_price : product.retail_price;
       
-      if (unit === 'box') {
-        // Per karton: pakai retail_box_price
-        price = product.retail_box_price;
-      } else if (unit === 'pcs') {
-        // Per pcs: cek apakah bisa grosir
-        if (1 >= product.min_wholesale_qty && product.min_wholesale_qty > 0) {
-          price = product.wholesale_price; // Grosir jika qty >= min_wholesale_qty
-        } else {
-          price = product.retail_price; // Eceran
-        }
-      }
-
       return [
-        ...prevCart, 
-        { 
-          product, 
-          quantity: 1, 
+        ...prevCart,
+        {
+          product,
+          quantity: 1,
           unit,
           price,
-          subtotal: price,
-          customPrice: false
+          subtotal: price
         }
       ];
     });
-  };
+  }, []);
+
+  // Handle barcode input changes
+  useEffect(() => {
+    const handleBarcodeInput = async () => {
+      if (!barcodeInput || (!barcodeInput.includes('\n') && !barcodeInput.includes('\r'))) return;
+      
+      const cleanBarcode = barcodeInput.replace(/[\n\r]/g, '').trim();
+      if (!cleanBarcode) return;
+
+      try {
+        const { data: product, error } = await supabase
+          .from('products')
+          .select('*')
+          .eq('barcode', cleanBarcode)
+          .single();
+
+        if (error) throw error;
+        
+        if (product) {
+          addToCart(product, 'pcs');
+          toast.success(`${product.name} ditambahkan ke keranjang`);
+          setBarcodeInput('');
+        } else {
+          toast.error('Produk tidak ditemukan');
+        }
+      } catch (error) {
+        console.error('Error handling barcode scan:', error);
+        toast.error('Terjadi kesalahan saat memindai barcode');
+      }
+      
+      // Always focus back to input
+      const barcodeInputElement = document.getElementById('barcode') as HTMLInputElement;
+      if (barcodeInputElement) {
+        barcodeInputElement.focus();
+        barcodeInputElement.selectionStart = barcodeInputElement.selectionEnd = barcodeInputElement.value.length;
+      }
+    };
+
+    handleBarcodeInput();
+  }, [barcodeInput, supabase, addToCart]);
+
+
 
   const removeFromCart = (productId: string, unit: UnitType) => {
     setCart(prevCart => 
@@ -399,7 +340,6 @@ export default function NewTransactionPage() {
       
       console.log('Cashier ID:', currentCashierId, 'Name:', currentCashierName);
       setCashierName(currentCashierName);
-      setCashierId(currentCashierId);
 
       const cashierId = session?.user?.user_metadata?.user_id || '';
       const transactionData = {
@@ -427,7 +367,6 @@ export default function NewTransactionPage() {
       
       // Set the cashier ID from the transaction result if available
       if (result?.transaction?.cashier_id) {
-        setCashierId(result.transaction.cashier_id);
         setCashierName(result.transaction.cashier_id); // Just set the ID directly
       }
 
@@ -437,7 +376,6 @@ export default function NewTransactionPage() {
 
       // Set transaction complete state and show print button
       setTransactionId(result.transaction.id);
-      setShowPrintButton(true);
       setTransactionComplete(true);
       
       // Try to open cash drawer using printer commands
@@ -505,10 +443,11 @@ export default function NewTransactionPage() {
         }
       }, 300);
 
-    } catch (error: any) {
+    } catch (error) {
       console.error("Transaction error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Terjadi kesalahan saat memproses transaksi";
       toast.error("Gagal membuat transaksi", {
-        description: error.message || "Terjadi kesalahan saat memproses transaksi",
+        description: errorMessage,
       });
     } finally {
       setIsSubmitting(false);

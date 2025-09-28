@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Package, Users, FileText, DollarSign } from 'lucide-react';
-import { useAuth } from '@/contexts/auth-context';
 import { PageHeader } from '@/components/page-header';
 
 export default function DashboardPage() {

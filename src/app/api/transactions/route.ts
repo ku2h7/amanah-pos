@@ -53,8 +53,34 @@ export async function POST(req: Request) {
     
     console.log("Transactions table OK, test data:", testTransactions);
 
+    // Define interfaces for better type safety
+    interface CartItem {
+      product_id: string;
+      quantity: number;
+      unit?: 'pcs' | 'box';
+      qty_per_box?: number;
+      price_per_unit: number;
+      price: number;
+    }
+
+    interface Product {
+      id: string;
+      name: string;
+      qty: number;
+    }
+
+    interface OutOfStockItem {
+      product_id: string;
+      name: string;
+      available: number;
+      required: number;
+      unit: string;
+    }
+
     // Check stock availability first
-    const productIds = items.map((item: any) => item.product_id);
+    const productIds = items.map((item: CartItem) => item.product_id);
+    
+    // Fetch products with proper error handling
     const { data: products, error: productsError } = await supabase
       .from('products')
       .select('id, name, qty')
@@ -69,11 +95,12 @@ export async function POST(req: Request) {
     }
 
     // Create a map for quick lookup
-    const productMap = new Map(products.map(p => [p.id, p]));
+    const productMap = new Map<string, Product>();
+    products?.forEach((p: Product) => productMap.set(p.id, p));
     
     // Validate stock for each item
-    const outOfStockItems = [];
-    for (const item of items) {
+    const outOfStockItems: OutOfStockItem[] = [];
+    for (const item of items as CartItem[]) {
       const product = productMap.get(item.product_id);
       if (!product) continue;
 
@@ -132,7 +159,7 @@ export async function POST(req: Request) {
     const transactionNumber = `AMN-${datePrefix}-${sequenceNumber.toString().padStart(3, '0')}`;
 
     // 2. Calculate total amount
-    const totalAmount = items.reduce((sum: number, item: any) => {
+    const totalAmount = (items as CartItem[]).reduce((sum: number, item: CartItem) => {
       return sum + (item.price * item.quantity);
     }, 0);
 
@@ -208,15 +235,17 @@ export async function POST(req: Request) {
       );
     }
 
+    // Reuse the CartItem interface defined above
+
     // 6. Create transaction items
-    const transactionItems = items.map((item: any) => ({
+    const transactionItems = (items as CartItem[]).map((item) => ({
       transaction_id: transaction.id,
       product_id: item.product_id,
       quantity: item.quantity,
       price_per_unit: item.price,
       subtotal: item.price * item.quantity,
       unit: item.unit || 'pcs',
-      qty_per_box: item.qty_per_box || 1,
+      qty_per_box: item.qty_per_box ?? 1,
       created_at: new Date().toISOString(),
     }));
 
@@ -295,10 +324,12 @@ export async function POST(req: Request) {
       }, 
       { status: 201 }
     );
-  } catch (err: any) {
-    console.error("Transaction API error:", err);
+  } catch (error) {
+    console.error("Transaction API error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Internal server error";
+    const errorStack = error instanceof Error ? error.stack : undefined;
     return NextResponse.json(
-      { error: err.message || "Internal server error", details: err.stack },
+      { error: errorMessage, details: errorStack },
       { status: 500 }
     );
   }
@@ -329,9 +360,10 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json({ transactions });
-  } catch (err: any) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json(
-      { error: err.message || "Internal server error" },
+      { error: errorMessage },
       { status: 500 }
     );
   }

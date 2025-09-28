@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Package2, Package, ShoppingCart, PlusCircle, List, Receipt, Plus, User, Loader2, Hash } from 'lucide-react';
+import { Package2, Package, PlusCircle, List, Receipt, Plus, User, Loader2, Hash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';

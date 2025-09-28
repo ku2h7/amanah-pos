@@ -1,14 +1,6 @@
 // Check if Web Serial API is available
 const isWebSerialAPISupported = 'serial' in navigator;
 
-// Common USB vendor IDs for receipt printers
-const PRINTER_VENDOR_IDS = {
-  CH340: 0x1A86,    // Common CH340/341 chipset
-  PROLIFIC: 0x067B, // Prolific
-  FTDI: 0x0403,     // FTDI
-  CH340_ALT: 0x1A2C // CH340 (alternative ID)
-};
-
 // ESC/POS commands for Xprinter XP-5811Z cash drawer
 export const CASH_DRAWER_COMMANDS = {
   // Standard command for Xprinter (pin 2)
@@ -29,7 +21,7 @@ export const CASH_DRAWER_COMMANDS = {
  * @returns Promise<boolean> - Whether the command was sent successfully
  */
 // Store the port globally
-let currentPort: any = null;
+let currentPort: SerialPort | null = null;
 
 export async function openCashDrawer(pin: 2 | 5 = 2): Promise<boolean> {
   if (!isWebSerialAPISupported) {
@@ -47,6 +39,9 @@ export async function openCashDrawer(pin: 2 | 5 = 2): Promise<boolean> {
     if (currentPort) {
       try {
         await currentPort.open({ baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none' });
+        if (!currentPort.writable) {
+          throw new Error('Port is not writable');
+        }
         const writer = currentPort.writable.getWriter();
         
         // Try all Xprinter XP-5811Z commands in sequence
@@ -94,27 +89,60 @@ export async function openCashDrawer(pin: 2 | 5 = 2): Promise<boolean> {
       }
     }
 
+    // Extend Navigator to include serial property
+    interface NavigatorWithSerial extends Navigator {
+      serial: {
+        requestPort: () => Promise<SerialPort>;
+        getPorts: () => Promise<SerialPort[]>;
+      };
+    }
+
+    // Define SerialPort interface for TypeScript
+    interface SerialPort extends EventTarget {
+      readonly readable: ReadableStream<Uint8Array> | null;
+      readonly writable: WritableStream<Uint8Array> | null;
+      readonly signals: SerialOutputSignals;
+      open: (options: SerialOptions) => Promise<void>;
+      close: () => Promise<void>;
+      getInfo: () => SerialPortInfo;
+    }
+
+    interface SerialPortInfo {
+      usbVendorId?: number;
+      usbProductId?: number;
+      path?: string;
+    }
+
+    interface SerialOutputSignals {
+      dataTerminalReady: boolean;
+      requestToSend: boolean;
+      break: boolean;
+    }
+
     // If we get here, we need to request a new port
     try {
-      const port = await (navigator as any).serial.requestPort();
+      const navigatorWithSerial = navigator as unknown as NavigatorWithSerial;
+      const port = await navigatorWithSerial.serial.requestPort();
+      const portInfo = port.getInfo();
+      
       console.log('Selected port info:', {
-        usbVendorId: port.getInfo().usbVendorId?.toString(16),
-        usbProductId: port.getInfo().usbProductId?.toString(16),
-        portName: port.getInfo().path
+        usbVendorId: portInfo.usbVendorId?.toString(16),
+        usbProductId: portInfo.usbProductId?.toString(16),
+        portName: portInfo.path
       });
       
       // Save the port for future use
       currentPort = port;
       
-      if (!port) {
-        throw new Error('Tidak ada port USB printer yang terdeteksi. Pastikan printer terhubung dengan benar.');
+      // Configure the port
+      await port.open({ baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none' });
+      
+      // Get a writer
+      if (!port.writable) {
+        throw new Error('Port is not writable');
       }
-      
-      // Open the port
-      await port.open({ baudRate: 9600 });
-      
-      // Get writer
       const writer = port.writable.getWriter();
+      
       const command = pin === 2 ? CASH_DRAWER_COMMANDS.PIN2 : CASH_DRAWER_COMMANDS.PIN5;
       await writer.write(command);
       
