@@ -129,9 +129,9 @@ export default function AddStockPage() {
 
       <Card className="max-w-2xl mx-auto">
         <CardHeader>
-          <CardTitle>Tambah Stok Produk</CardTitle>
+          <CardTitle>Update Stok Produk</CardTitle>
           <CardDescription>
-            Menambahkan stok untuk produk: <span className="font-semibold">{product.name}</span>
+            Mengupdate stok untuk produk: <span className="font-semibold">{product.name}</span>
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
