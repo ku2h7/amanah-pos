@@ -14,12 +14,14 @@ import { id } from 'date-fns/locale';
 // Define the shape of transaction items
 interface TransactionItem {
   id: string;
-  created_at: string;
+  created_at?: string;  // Optional because it might not be included in the API response
   transaction_id: string;
   product_id: string;
   quantity: number;
-  price: number;
+  price_per_unit: number;
   subtotal: number;
+  unit: 'pcs' | 'box';
+  qty_per_box?: number;
   products?: {
     id: string;
     name: string;
@@ -29,14 +31,19 @@ interface TransactionItem {
 
 // Define the shape of a transaction
 interface Transaction {
-  id: string;  // This is now the transaction_number (e.g., 'TXN-001')
+  id: string;  // This is the transaction number (e.g., 'AMN-0124-001')
   created_at: string;
   updated_at: string | null;
   customer_name: string;
   total_amount: number;
+  amount_paid: number;
   change_amount: number;
   is_paid: boolean;
   notes: string | null;
+  cashier_id: string;
+  admin_users?: {
+    full_name: string;
+  };
   transaction_items: TransactionItem[];
 }
 
@@ -106,37 +113,100 @@ export default function TransactionsPage() {
           return;
         }
 
+        // Define the shape of transaction item from API
+        interface TransactionItemFromAPI {
+          id: string;
+          transaction_id?: string; // Optional because it might be in the parent object
+          product_id: string;
+          quantity: number;
+          price_per_unit: number;
+          subtotal: number;
+          unit: 'pcs' | 'box';
+          qty_per_box?: number;
+          created_at?: string; // Optional because it might not be included in the API response
+          products: {
+            id: string;
+            name: string;
+            barcode: string | null;
+          } | null;
+        }
+
+        // Define the shape of transaction from API
+        interface TransactionFromAPI {
+          id: string;
+          created_at: string;
+          updated_at: string | null;
+          customer_name: string;
+          total_amount: number;
+          amount_paid: number;
+          change_amount: number;
+          is_paid: boolean;
+          notes: string | null;
+          cashier_id: string;
+          admin_users?: {
+            full_name: string;
+          };
+          transaction_items: TransactionItemFromAPI[];
+        }
+
         // Process the transactions data
-        const processedTransactions: Transaction[] = transactionsData.map(transaction => ({
-          ...transaction,
-          transaction_items: (transaction.transaction_items || []).map((item: any) => ({
-            ...item,
-            products: item.products ? {
-              id: item.products.id,
-              name: item.products.name,
-              barcode: item.products.barcode
-            } : null
-          }))
-        }));
+        const processedTransactions: Transaction[] = (transactionsData as TransactionFromAPI[]).map(transaction => {
+          // Ensure transaction_items is always an array
+          const items = Array.isArray(transaction.transaction_items) 
+            ? transaction.transaction_items 
+            : [];
+
+          return {
+            ...transaction,
+            transaction_items: items.map(item => ({
+              id: item.id,
+              transaction_id: item.transaction_id || transaction.id, // Use parent transaction id if not available
+              product_id: item.product_id,
+              quantity: item.quantity,
+              price_per_unit: item.price_per_unit,
+              subtotal: item.subtotal,
+              unit: item.unit || 'pcs',
+              qty_per_box: item.qty_per_box ?? 1,
+              created_at: item.created_at || new Date().toISOString(),
+              products: item.products ? {
+                id: item.products.id,
+                name: item.products.name,
+                barcode: item.products.barcode
+              } : null
+            }))
+          };
+        });
         
         console.log('Processed transactions data:', processedTransactions);
         setTransactions(processedTransactions);
         setFilteredTransactions(processedTransactions);
-      } catch (err: any) {
+      } catch (error) {
+        // Define a more specific error type that includes Supabase error properties
+        type SupabaseError = Error & { 
+          code?: string; 
+          details?: string;
+          hint?: string;
+          status?: number;
+        };
+        
+        const err = error as SupabaseError;
+        
+        // Log error details safely
         console.error('Error in fetchTransactions:', {
           error: err,
-          message: err?.message,
-          code: err?.code,
-          details: err?.details,
-          hint: err?.hint,
-          status: err?.status
+          message: err.message,
+          code: err.code,
+          details: err.details,
+          hint: err.hint,
+          status: err.status
         });
         
+        // Set appropriate error message
         let errorMessage = 'Terjadi kesalahan yang tidak diketahui';
         
-        if (err?.message) {
+        if (err.message) {
           errorMessage = err.message;
-        } else if (err?.details) {
+        } else if (err.details) {
           errorMessage = err.details;
         } else if (err?.hint) {
           errorMessage = err.hint;

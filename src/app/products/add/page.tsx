@@ -1,10 +1,9 @@
 'use client';
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -12,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, ChevronDown } from "lucide-react";
+import { ArrowLeft} from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -55,7 +54,7 @@ export default function AddProductPage() {
     is_editable: false,
     supplier_id: null,
   });
-  const [costPricePerPcs, setCostPricePerPcs] = useState<number>(0);
+
   const [suppliers, setSuppliers] = useState<Array<{id: string, name: string}>>([]);
   const [loadingSuppliers, setLoadingSuppliers] = useState(true);
 
@@ -154,7 +153,6 @@ export default function AddProductPage() {
           
           // Calculate price per piece and round to nearest integer
           const pricePerPcs = Math.round(cartonPrice / pcsCount);
-          setCostPricePerPcs(pricePerPcs);
           updatedData.cost_price = pricePerPcs;
         }
         
@@ -176,6 +174,8 @@ export default function AddProductPage() {
     
     try {
       // Create a copy of formData and remove karton_qty as it's only for calculation
+      
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { karton_qty, ...dataToSave } = formData;
       
       // Prepare data for submission

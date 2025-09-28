@@ -1,9 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { ArrowUpDown, ChevronDown, MoreHorizontal, PlusCircle, Pencil, Trash2, Plus } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal, PlusCircle, Pencil, Trash2, Plus } from 'lucide-react';
 import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
@@ -21,8 +20,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -170,7 +167,6 @@ const columns = (handleDelete: (id: string) => void): ColumnDef<Product>[] => [
 ];
 
 export default function ProductsPage() {
-  const router = useRouter();
   const [products, setProducts] = React.useState<Product[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [sorting, setSorting] = React.useState<SortingState>([]);

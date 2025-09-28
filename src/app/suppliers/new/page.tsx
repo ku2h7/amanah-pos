@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { supabase } from "@/lib/supabaseClient"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -55,7 +54,6 @@ export default function NewSupplierPage() {
         throw new Error('Gagal menambahkan supplier');
       }
 
-      const data = await response.json();
       router.push('/suppliers');
       router.refresh();
       toast.success('Supplier berhasil ditambahkan');

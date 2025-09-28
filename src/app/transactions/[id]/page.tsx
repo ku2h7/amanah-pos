@@ -1,12 +1,11 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, Printer, Loader2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { format } from 'date-fns';
-import { id } from 'date-fns/locale';
 import { ReceiptTemplate, printReceipt } from "@/components/receipt/ReceiptTemplate";
 import { getTransactionById } from "@/lib/api/transactions";
 

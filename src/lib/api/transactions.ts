@@ -1,8 +1,6 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { Database } from '@/lib/database.types';
 
-const supabase = createClientComponentClient<Database>();
-
 export interface TransactionItemPayload {
   product_id: string | number;   // Changed from number to string to match UUID
   quantity: number;
