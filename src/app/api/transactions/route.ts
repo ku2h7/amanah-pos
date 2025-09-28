@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     console.log("Testing transactions table...");
     const { data: testTransactions, error: testTransactionsError } = await supabase
       .from("transactions")
-      .select("id, transaction_number")
+      .select("id")
       .limit(1);
     
     if (testTransactionsError) {
@@ -53,21 +53,83 @@ export async function POST(req: Request) {
     
     console.log("Transactions table OK, test data:", testTransactions);
 
+    // Check stock availability first
+    const productIds = items.map((item: any) => item.product_id);
+    const { data: products, error: productsError } = await supabase
+      .from('products')
+      .select('id, name, qty')
+      .in('id', productIds);
+
+    if (productsError) {
+      console.error('Error fetching products:', productsError);
+      return NextResponse.json(
+        { error: 'Gagal memeriksa stok produk' },
+        { status: 500 }
+      );
+    }
+
+    // Create a map for quick lookup
+    const productMap = new Map(products.map(p => [p.id, p]));
+    
+    // Validate stock for each item
+    const outOfStockItems = [];
+    for (const item of items) {
+      const product = productMap.get(item.product_id);
+      if (!product) continue;
+
+      let requiredQty = item.quantity;
+      if (item.unit === 'box') {
+        requiredQty = item.quantity * (item.qty_per_box || 1);
+      }
+
+      if ((product.qty || 0) < requiredQty) {
+        outOfStockItems.push({
+          product_id: product.id,
+          name: product.name,
+          available: product.qty || 0,
+          required: requiredQty,
+          unit: item.unit === 'box' ? 'box' : 'pcs'
+        });
+      }
+    }
+
+    if (outOfStockItems.length > 0) {
+      console.error('Insufficient stock for items:', outOfStockItems);
+      return NextResponse.json(
+        { 
+          error: 'Stok tidak mencukupi',
+          outOfStockItems,
+          message: 'Beberapa produk stoknya tidak mencukupi'
+        },
+        { status: 400 }
+      );
+    }
+
     // Generate transaction number
     const { data: lastTransaction } = await supabase
       .from("transactions")
-      .select("transaction_number")
+      .select("id, created_at")
       .order("created_at", { ascending: false })
       .limit(1);
 
-    let transactionNumber = "TRX-001";
+    // Get current date components for the transaction number
+    const now = new Date();
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const year = now.getFullYear().toString().slice(-2);
+    const datePrefix = `${month}${year}`;
+    
+    let sequenceNumber = 1;
     if (lastTransaction && lastTransaction.length > 0) {
-      const lastNumber = lastTransaction[0].transaction_number;
-      if (lastNumber && lastNumber.startsWith("TRX-")) {
-        const number = parseInt(lastNumber.replace("TRX-", ""));
-        transactionNumber = `TRX-${(number + 1).toString().padStart(3, "0")}`;
+      const lastNumber = lastTransaction[0].id;
+      if (lastNumber && lastNumber.startsWith(`AMN-${datePrefix}-`)) {
+        const lastSequence = parseInt(lastNumber.split('-')[2]);
+        if (!isNaN(lastSequence)) {
+          sequenceNumber = lastSequence + 1;
+        }
       }
     }
+    
+    const transactionNumber = `AMN-${datePrefix}-${sequenceNumber.toString().padStart(3, '0')}`;
 
     // 2. Calculate total amount
     const totalAmount = items.reduce((sum: number, item: any) => {
@@ -120,7 +182,7 @@ export async function POST(req: Request) {
 
     // 5. Create transaction
     const transactionData = {
-      transaction_number: transactionNumber,
+      id: transactionNumber,
       customer_name: customer_name || "Pelanggan",
       total_amount: totalAmount,
       amount_paid: amount_paid || 0,
@@ -177,6 +239,50 @@ export async function POST(req: Request) {
         { error: "Gagal menyimpan detail transaksi", details: itemsError.message },
         { status: 500 }
       );
+    }
+
+    // Update product quantities
+    for (const item of items) {
+      const { data: product, error: productError } = await supabase
+        .from("products")
+        .select("qty")
+        .eq("id", item.product_id)
+        .single();
+
+      if (productError) {
+        console.error(`Error fetching product ${item.product_id}:`, productError);
+        continue; // Skip this product but continue with others
+      }
+
+      // Calculate quantity to deduct based on unit
+      let quantityToDeduct = item.quantity;
+      
+      if (item.unit === 'box') {
+        // If sold by box, multiply by qty_per_box
+        const qtyPerBox = item.qty_per_box || 1;
+        quantityToDeduct = item.quantity * qtyPerBox;
+        console.log(`Deducting ${item.quantity} box(es) (${quantityToDeduct} pcs) for product ${item.product_id}`);
+      } else {
+        console.log(`Deducting ${quantityToDeduct} pcs for product ${item.product_id}`);
+      }
+
+      // Ensure we don't go below 0
+      const currentQty = product.qty || 0;
+      const newQty = Math.max(0, currentQty - quantityToDeduct);
+      
+      const { error: updateError } = await supabase
+        .from("products")
+        .update({ 
+          qty: newQty,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", item.product_id);
+
+      if (updateError) {
+        console.error(`Error updating product ${item.product_id}:`, updateError);
+      } else {
+        console.log(`Updated product ${item.product_id} qty from ${currentQty} to ${newQty}`);
+      }
     }
 
     return NextResponse.json(
