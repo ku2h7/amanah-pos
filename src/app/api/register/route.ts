@@ -77,7 +77,17 @@ export async function POST(req: Request) {
     const formattedId = `ADM-${nextId.toString().padStart(3, '0')}`;
 
     // 4. Insert ke admin_users
-    const insertData: any = {
+    interface AdminUser {
+      id: string;
+      auth_user_id: string;
+      full_name: string;
+      email: string;
+      phone_number: string | null;
+      created_at: string;
+      updated_at: string;
+    }
+
+    const insertData: AdminUser = {
       id: formattedId,
       auth_user_id: data.user.id,
       full_name: fullName,
@@ -97,9 +107,10 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ message: "Register berhasil" }, { status: 201 });
-  } catch (err: any) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: err.message || "Internal server error" },
+      { error: errorMessage },
       { status: 500 }
     );
   }

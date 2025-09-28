@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,7 +26,6 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [isChecking, setIsChecking] = useState(true);
   const router = useRouter();
-  const supabase = createClientComponentClient();
 
   // Set loading false setelah component mount
   useEffect(() => {
@@ -66,11 +64,12 @@ export default function RegisterPage() {
       setTimeout(() => {
         router.push("/login");
       }, 2000);
-    } catch (err: any) {
-      console.error("Registration error:", err);
-      setError(err.message || "Terjadi kesalahan saat mendaftar");
+    } catch (error) {
+      console.error("Registration error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Terjadi kesalahan saat mendaftar";
+      setError(errorMessage);
       toast.error("Gagal mendaftar", {
-        description: err.message || "Terjadi kesalahan saat mendaftar",
+        description: errorMessage,
       });
     } finally {
       setLoading(false);

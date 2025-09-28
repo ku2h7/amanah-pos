@@ -1,9 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { ArrowUpDown, ChevronDown, MoreHorizontal, Plus, Pencil, Trash2 } from 'lucide-react';
+import { ArrowUpDown, MoreHorizontal, Plus, Pencil, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
@@ -142,7 +141,6 @@ const columns: ColumnDef<Supplier>[] = [
 ];
 
 export default function SuppliersPage() {
-  const router = useRouter();
   const [suppliers, setSuppliers] = React.useState<Supplier[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [sorting, setSorting] = React.useState<SortingState>([]);

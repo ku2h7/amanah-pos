@@ -20,7 +20,7 @@ export default function CashDrawerTestPage() {
           <li>Pastikan driver USB printer sudah terinstall di komputer</li>
           <li>Gunakan browser Chrome/Edge versi terbaru</li>
           <li>Jika muncul popup pemilihan port, pilih port yang sesuai dengan printer Anda</li>
-          <li>Klik "Connect" atau "Hubungkan" saat diminta izin akses serial</li>
+          <li>Klik &quot;Connect&quot; atau &quot;Hubungkan&quot; saat diminta izin akses serial</li>
         </ol>
         
         <div className="mt-4 p-3 bg-yellow-50 border-l-4 border-yellow-400">

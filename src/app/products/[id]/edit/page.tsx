@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Loader2, ChevronDown } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -85,7 +85,6 @@ export default function EditProductPage() {
     exp_date: null,
     is_editable: false,
   });
-  const [costPricePerPcs, setCostPricePerPcs] = useState<number>(0);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -155,12 +154,6 @@ export default function EditProductPage() {
     return str === '' ? 0 : parseInt(str.replace(/\./g, ''), 10) || 0;
   };
   
-  // Format number for display with currency symbol
-  const formatCurrency = (num: number | null | undefined): string => {
-    if (num === null || num === undefined) return '0';
-    return num.toLocaleString('id-ID');
-  };
-
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     
@@ -190,7 +183,6 @@ export default function EditProductPage() {
           const pcsCount = name === 'qty_per_box' ? Math.max(1, numValue) : Math.max(1, prev.qty_per_box || 1);
           
           const pricePerPcs = Math.round(cartonPrice / pcsCount);
-          setCostPricePerPcs(pricePerPcs);
           updatedData.cost_price = pricePerPcs;
         }
         

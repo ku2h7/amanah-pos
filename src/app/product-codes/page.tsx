@@ -1,9 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { ArrowUpDown, ChevronDown, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/page-header';
@@ -20,7 +19,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -117,7 +115,6 @@ const columns: ColumnDef<ProductCode>[] = [
 ];
 
 export default function ProductCodesPage() {
-  const router = useRouter();
   const [productCodes, setProductCodes] = React.useState<ProductCode[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -126,7 +123,6 @@ export default function ProductCodesPage() {
   const [codePrefix, setCodePrefix] = React.useState('');
   const [description, setDescription] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const dialogTriggerRef = React.useRef<HTMLButtonElement>(null);
 
   React.useEffect(() => {
@@ -174,7 +170,6 @@ export default function ProductCodesPage() {
       setKeyword('');
       setCodePrefix('');
       setDescription('');
-      setIsDialogOpen(false);
       if (dialogTriggerRef.current) {
         dialogTriggerRef.current.focus();
       }
@@ -257,8 +252,7 @@ export default function ProductCodesPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => {
-                    setIsDialogOpen(false);
+                  onClick={() => { 
                     if (dialogTriggerRef.current) {
                       dialogTriggerRef.current.focus();
                     }
