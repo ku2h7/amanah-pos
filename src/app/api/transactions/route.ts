@@ -18,6 +18,7 @@ export async function POST(req: Request) {
     }
 
     // Test database connection first
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { data: testData, error: testError } = await supabase
       .from("admin_users")
       .select("id")
@@ -32,6 +33,7 @@ export async function POST(req: Request) {
     }
     
     // 1. Test transactions table
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { data: testTransactions, error: testTransactionsError } = await supabase
       .from("transactions")
       .select("id")
