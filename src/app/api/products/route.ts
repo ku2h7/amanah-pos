@@ -30,8 +30,7 @@ export async function GET() {
 }
 
 async function findMatchingProductCode(productName: string) {
-  const cookieStore = cookies()
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+  const supabase = createRouteHandlerClient({ cookies });
   
   // Get all product codes
   const { data: codes, error: codesError } = await supabase
@@ -52,8 +51,7 @@ async function findMatchingProductCode(productName: string) {
 }
 
 async function generateProductId(prefix: string) {
-  const cookieStore = cookies();
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+  const supabase = createRouteHandlerClient({ cookies });
   
   // Find the latest product ID with this prefix
   const { data: latestProduct, error } = await supabase
@@ -99,6 +97,7 @@ export async function POST(request: Request) {
       retail_price: Math.round(Number(productData.retail_price) || 0),
       retail_box_price: Math.round(Number(productData.retail_box_price) || 0),
       wholesale_price: Math.round(Number(productData.wholesale_price) || 0),
+      reseller_price: Math.round(Number(productData.reseller_price) || 0),
       min_wholesale_qty: productData.min_wholesale_qty ? Math.round(Number(productData.min_wholesale_qty)) : null,
     };
     
@@ -129,6 +128,7 @@ export async function POST(request: Request) {
         retail_price: roundedData.retail_price,
         retail_box_price: roundedData.retail_box_price,
         wholesale_price: roundedData.wholesale_price,
+        reseller_price: roundedData.reseller_price,
         min_wholesale_qty: roundedData.min_wholesale_qty,
         barcode: roundedData.barcode,
         exp_date: roundedData.exp_date,

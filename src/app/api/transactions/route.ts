@@ -8,9 +8,7 @@ const supabase = createClient(
 
 export async function POST(req: Request) {
   try {
-    console.log("Transaction API called");
     const { customer_name, items, amount_paid } = await req.json();
-    console.log("Request data:", { customer_name, items, amount_paid });
 
     if (!items || items.length === 0) {
       return NextResponse.json(
@@ -20,7 +18,6 @@ export async function POST(req: Request) {
     }
 
     // Test database connection first
-    console.log("Testing database connection...");
     const { data: testData, error: testError } = await supabase
       .from("admin_users")
       .select("id")
@@ -34,10 +31,7 @@ export async function POST(req: Request) {
       );
     }
     
-    console.log("Database connection OK, test data:", testData);
-
     // 1. Test transactions table
-    console.log("Testing transactions table...");
     const { data: testTransactions, error: testTransactionsError } = await supabase
       .from("transactions")
       .select("id")
@@ -51,8 +45,6 @@ export async function POST(req: Request) {
       );
     }
     
-    console.log("Transactions table OK, test data:", testTransactions);
-
     // Define interfaces for better type safety
     interface CartItem {
       product_id: string;
@@ -165,7 +157,6 @@ export async function POST(req: Request) {
 
     // 3. Get current user (cashier) - Simplified approach
     const authHeader = req.headers.get("authorization");
-    console.log("Auth header:", authHeader);
     
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json(
@@ -175,7 +166,6 @@ export async function POST(req: Request) {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    console.log("Token:", token.substring(0, 20) + "...");
     
     // Use service role to verify token and get user
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
@@ -187,8 +177,6 @@ export async function POST(req: Request) {
         { status: 401 }
       );
     }
-
-    console.log("User authenticated:", user.email);
 
     // 4. Get cashier_id from admin_users
     const { data: adminUser, error: adminError } = await supabase
@@ -205,8 +193,6 @@ export async function POST(req: Request) {
       );
     }
 
-    console.log("Admin user found:", adminUser.id);
-
     // 5. Create transaction
     const transactionData = {
       id: transactionNumber,
@@ -218,8 +204,6 @@ export async function POST(req: Request) {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-
-    console.log("Creating transaction with data:", transactionData);
 
     const { data: transaction, error: transactionError } = await supabase
       .from("transactions")
