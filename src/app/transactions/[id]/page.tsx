@@ -50,7 +50,6 @@ export default function TransactionDetail() {
     const fetchTransaction = async () => {
       try {
         const data = await getTransactionById(id as string);
-        console.log('Fetched transaction data:', JSON.stringify(data, null, 2));
         setTransaction(data);
       } catch (err) {
         console.error('Error fetching transaction:', err);

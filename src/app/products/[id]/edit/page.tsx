@@ -29,6 +29,7 @@ type Product = {
   retail_price: number;  // Harga jual per pcs
   retail_box_price: number; // Harga jual per karton
   wholesale_price: number;
+  reseller_price: number; // Harga jual reseller
   min_wholesale_qty: number | null;
   barcode: string | null;
   exp_date: string | null;
@@ -80,6 +81,7 @@ export default function EditProductPage() {
     retail_price: 0,  // Harga jual per pcs
     retail_box_price: 0, // Harga jual per karton
     wholesale_price: 0,
+    reseller_price: 0, // Harga jual reseller
     min_wholesale_qty: null,
     barcode: null,
     exp_date: null,
@@ -158,7 +160,7 @@ export default function EditProductPage() {
     const { name, value } = e.target;
     
     // For numeric inputs, parse the value as integer
-    if (['karton_qty', 'qty_per_box', 'qty', 'min_wholesale_qty', 'box_price', 'cost_price', 'retail_price', 'retail_box_price', 'wholesale_price'].includes(name)) {
+    if (['karton_qty', 'qty_per_box', 'qty', 'min_wholesale_qty', 'box_price', 'cost_price', 'retail_price', 'retail_box_price', 'wholesale_price', 'reseller_price'].includes(name)) {
       const numValue = value === '' ? 0 : parseNumber(value);
       
       setFormData(prev => {
@@ -446,7 +448,7 @@ export default function EditProductPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="retail_box_price" className="flex items-center gap-1">
                     Harga Jual <span className="text-xs italic text-muted-foreground">(eceran per karton / rtg / slop)</span>
@@ -476,8 +478,29 @@ export default function EditProductPage() {
                   )}
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="reseller_price" className="flex items-center gap-1">
+                    Harga Jual <span className="text-xs italic text-muted-foreground">(reseller per pcs)</span>
+                  </Label>
+                  <Input
+                    id="reseller_price"
+                    name="reseller_price"
+                    type="text"
+                    value={formatNumber(formData.reseller_price || 0)}
+                    onChange={handleNumberChange}
+                    onBlur={(e) => {
+                      const numValue = parseNumber(e.target.value);
+                      setFormData(prev => ({
+                        ...prev,
+                        reseller_price: numValue
+                      }));
+                    }}
+                    placeholder="Harga reseller"
+                    min="0"
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="wholesale_price" className="flex items-center gap-1">
-                    Harga Jual <span className="text-xs italic text-muted-foreground">(grosir minimum qty)</span>
+                    Harga Jual <span className="text-xs italic text-muted-foreground">(grosir konsumen)</span>
                   </Label>
                   <Input
                     id="wholesale_price"
@@ -492,14 +515,14 @@ export default function EditProductPage() {
                         wholesale_price: numValue
                       }));
                     }}
-                    placeholder="Harga grosir minimum qty"
+                    placeholder="Harga grosir"
                     min="0"
                   />
                   {formData.cost_price !== null && formData.cost_price !== undefined && formData.cost_price > 0 && (
                     <div className="text-[11px] text-blue-500 font-normal mt-1 space-y-0.5">
                       <div>Harga +5%: {formatNumber(Math.round(formData.cost_price * 1.05))}</div>
-                      <div>Harga +8%: {formatNumber(Math.round(formData.cost_price * 1.08))}</div>
-                      <div>Khusus Rokok +3%: {formatNumber(Math.round(formData.cost_price * 1.03))}</div>
+                      <div>Harga +10%: {formatNumber(Math.round(formData.cost_price * 1.10))}</div>
+                      <div>Kosongkan, khusus Rokok pakai harga per slop</div>
                     </div>
                   )}
                 </div>
@@ -525,10 +548,10 @@ export default function EditProductPage() {
                     required
                   />
                   {formData.cost_price !== null && formData.cost_price !== undefined && formData.cost_price > 0 && (
-                    <div className="text-xs text-amber-600 font-medium mt-1 space-y-0.5">
+                    <div className="text-[11px] text-amber-600 font-medium mt-1 space-y-0.5">
                       <div>Harga +10%: {formatNumber(Math.round(formData.cost_price * 1.10))}</div>
                       <div>Harga +15%: {formatNumber(Math.round(formData.cost_price * 1.15))}</div>
-                      <div>Khusus Rokok +5%: {formatNumber(Math.round(formData.cost_price * 1.05))}</div>
+                      <div>Khusus Rokok Naik 1000 - 2000</div>
                     </div>
                   )}
                 </div>

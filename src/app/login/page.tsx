@@ -32,7 +32,6 @@ export default function LoginPage() {
   // Redirect jika sudah login
   useEffect(() => {
     if (user && !authLoading) {
-      console.log('Login page: User detected, redirecting to /');
       router.push("/");
     }
   }, [user, authLoading, router]);
@@ -90,7 +89,6 @@ export default function LoginPage() {
 
       // Redirect langsung ke home dengan delay kecil
       setTimeout(() => {
-        console.log('Login page: Manual redirect to / after successful login');
         router.push("/");
         router.refresh();
       }, 500);

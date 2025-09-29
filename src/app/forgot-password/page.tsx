@@ -30,12 +30,6 @@ export default function ForgotPasswordPage() {
       toast.success('Email reset password telah dikirim', {
         description: 'Silakan periksa email Anda untuk petunjuk selanjutnya',
       });
-      
-      // In development, log the reset link to console
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Reset password link sent to:', email);
-        // The actual reset link will be in the Supabase logs
-      }
     } catch (error) {
       console.error('Error sending reset email:', error);
       toast.error('Gagal mengirim email reset password', {
