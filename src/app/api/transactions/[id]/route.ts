@@ -17,8 +17,6 @@ export async function GET(request: Request, context) {
         { status: 400 }
       );
     }
-
-    console.log('Fetching transaction with ID:', id);
     
     // First, get the transaction
     const { data: transaction, error: transactionError } = await supabase
@@ -47,8 +45,6 @@ export async function GET(request: Request, context) {
         { status: 404 }
       );
     }
-
-    console.log('Fetching transaction items for transaction ID:', transaction.id);
     
     // Then get the transaction items
     const { data: items, error: itemsError } = await supabase
@@ -74,8 +70,6 @@ export async function GET(request: Request, context) {
         { status: 500 }
       );
     }
-
-    console.log('Fetched transaction items:', JSON.stringify(items, null, 2));
 
     return NextResponse.json({
       ...transaction,

@@ -40,6 +40,7 @@ export async function PUT(request: Request, context) {
       retail_price: Math.round(Number(productData.retail_price) || 0),
       retail_box_price: Math.round(Number(productData.retail_box_price) || 0),
       wholesale_price: Math.round(Number(productData.wholesale_price) || 0),
+      reseller_price: Math.round(Number(productData.reseller_price) || 0),
       min_wholesale_qty: productData.min_wholesale_qty ? Math.round(Number(productData.min_wholesale_qty)) : null,
     };
     
@@ -54,6 +55,7 @@ export async function PUT(request: Request, context) {
         retail_price: roundedData.retail_price,
         retail_box_price: roundedData.retail_box_price,
         wholesale_price: roundedData.wholesale_price,
+        reseller_price: roundedData.reseller_price,
         min_wholesale_qty: roundedData.min_wholesale_qty,
         barcode: roundedData.barcode,
         exp_date: roundedData.exp_date,
