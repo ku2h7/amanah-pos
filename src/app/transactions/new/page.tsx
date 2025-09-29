@@ -20,6 +20,7 @@ interface Product {
   name: string;
   retail_price: number;
   retail_box_price: number;
+  reseller_price: number;
   wholesale_price: number;
   min_wholesale_qty: number;
   qty_per_box: number;
@@ -42,20 +43,211 @@ export default function NewTransactionPage() {
     subtotal: number;
     customPrice?: boolean;
   }>>([]);
+  
+  // State management
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [barcodeInput, setBarcodeInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [amountPaid, setAmountPaid] = useState("");
+  const [isReseller, setIsReseller] = useState(false);
   const [transactionId, setTransactionId] = useState("");
   const [triedSubmit, setTriedSubmit] = useState(false);
   const [transactionComplete, setTransactionComplete] = useState(false);
+  const [cashierName, setCashierName] = useState('Admin');
+  const [searchResults, setSearchResults] = useState<Product[]>([]);
+  
+  // Refs
+  const barcodeBuffer = useRef('');
+  const barcodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
   const tempRef = useRef<HTMLDivElement | null>(null);
-  const [cashierName, setCashierName] = useState('Admin');
+  const searchTimeout = useRef<number | null>(null);
+  const barcodeInputRef = useRef<HTMLInputElement>(null);
+  const lastBarcodeTime = useRef<number>(0);
   
+  // Handle barcode scanner input
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Abaikan jika sedang fokus di input lain
+      if (document.activeElement?.tagName === 'INPUT' && document.activeElement.id !== 'barcode-input') {
+        return;
+      }
+
+      const now = Date.now();
+      
+      // Jika input adalah Enter, cari produk
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        // Hanya proses jika input terakhir lebih dari 100ms yang lalu (menghindari double input)
+        if (now - lastBarcodeTime.current > 100) {
+          lastBarcodeTime.current = now;
+          if (barcodeInput.trim()) {
+            // Trigger submit
+            const event = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13 });
+            barcodeInputRef.current?.dispatchEvent(event);
+          }
+        }
+        return;
+      } 
+      
+      // Jika input adalah karakter biasa, fokus ke input barcode
+      if (e.key.length === 1 && e.key !== ' ' && !e.ctrlKey && !e.metaKey) {
+        // Fokus ke input barcode jika belum fokus
+        if (document.activeElement?.id !== 'barcode-input' && barcodeInputRef.current) {
+          barcodeInputRef.current.focus();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [barcodeInput]);
+  
+  // Supabase client
   const supabase = createClientComponentClient<Database>();
+
+  // Add to cart function
+  const addToCart = useCallback((product: Product, unit: UnitType) => {
+    // Remove the added product from search results without triggering search
+    setProducts(prevProducts => {
+      const filtered = prevProducts.filter(p => p.id !== product.id);
+      return filtered;
+    });
+    
+    // Update cart synchronously without loading state
+    setCart(prevCart => {
+      const existingItemIndex = prevCart.findIndex(
+        item => item.product.id === product.id && item.unit === unit
+      );
+
+      if (existingItemIndex >= 0) {
+        return prevCart.map((item, idx) => {
+          if (idx === existingItemIndex) {
+            const newQuantity = item.quantity + 1;
+            return {
+              ...item,
+              quantity: newQuantity,
+              subtotal: newQuantity * (unit === 'box' ? product.retail_box_price : product.retail_price)
+            };
+          }
+          return item;
+        });
+      }
+
+      const price = unit === 'box' ? product.retail_box_price : product.retail_price;
+      
+      return [
+        ...prevCart,
+        {
+          product,
+          quantity: 1,
+          unit,
+          price,
+          subtotal: price
+        }
+      ];
+    });
+  }, [setProducts, setCart]);
+
+  // Process barcode from scanner
+  const processBarcode = useCallback((barcode: string) => {
+    const product = products.find(p => p.barcode === barcode);
+    if (product) {
+      // Add to cart or increment quantity
+      addToCart(product, 'pcs');
+      toast.success(`${product.name} ditambahkan ke keranjang`);
+    } else {
+      // If no product found, set the barcode input field
+      setBarcodeInput(barcode);
+      // Focus on the barcode input field
+      const barcodeInput = document.getElementById('barcode-input') as HTMLInputElement;
+      if (barcodeInput) {
+        barcodeInput.focus();
+        barcodeInput.select();
+      }
+    }
+  }, [products, addToCart]);
+
+  // Handle global barcode scanner input
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip if user is typing in an input field
+      const activeElement = document.activeElement as HTMLElement;
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(activeElement?.tagName)) {
+        // Only process Enter key in barcode input
+        if (activeElement.id !== 'barcode-input' || e.key !== 'Enter') {
+          return;
+        }
+        // If Enter is pressed in barcode input, process it manually
+        if (barcodeInput) {
+          e.preventDefault();
+          processBarcode(barcodeInput);
+          setBarcodeInput('');
+          return;
+        }
+      }
+
+      // Reset buffer if last key was pressed more than 100ms ago
+      if (barcodeTimer.current) {
+        clearTimeout(barcodeTimer.current);
+      }
+
+      // If Enter is pressed, process the barcode
+      if (e.key === 'Enter' && barcodeBuffer.current.length > 0) {
+        processBarcode(barcodeBuffer.current);
+        barcodeBuffer.current = '';
+        return;
+      }
+
+      // Only process printable characters
+      if (e.key.length === 1 && e.key !== ' ' && e.key !== 'Enter') {
+        barcodeBuffer.current += e.key;
+      }
+
+      // Reset buffer after 100ms of no input
+      barcodeTimer.current = setTimeout(() => {
+        if (barcodeBuffer.current.length >= 8) { // Minimum barcode length
+          processBarcode(barcodeBuffer.current);
+        }
+        barcodeBuffer.current = '';
+      }, 100);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      if (barcodeTimer.current) {
+        clearTimeout(barcodeTimer.current);
+        barcodeTimer.current = null;
+      }
+    };
+  }, [processBarcode, barcodeInput]);
+
+  // Update harga di keranjang saat status reseller berubah
+  useEffect(() => {
+    if (cart.length > 0) {
+      setCart(prevCart => 
+        prevCart.map(item => {
+          const price = isReseller && item.product.reseller_price > 0 
+            ? item.product.reseller_price 
+            : item.unit === 'box' 
+              ? item.product.retail_box_price 
+              : item.product.retail_price;
+              
+          return {
+            ...item,
+            price,
+            subtotal: price * item.quantity
+          };
+        })
+      );
+    }
+  }, [isReseller]);
+  // State and refs are already declared at the top of the component
 
   // Reset form to initial state
   const resetForm = () => {
@@ -83,9 +275,6 @@ export default function NewTransactionPage() {
     return parseInt(value.replace(/[^\d]/g, '')) || 0;
   };
 
-  // Track search state
-  const searchTimeout = useRef<number | null>(null);
-  const [searchResults, setSearchResults] = useState<Product[]>([]);
 
   // Filter out products that are already in the cart
   const filteredProducts = useMemo(() => {
@@ -153,48 +342,6 @@ export default function NewTransactionPage() {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm, supabase]);
-
-  const addToCart = useCallback((product: Product, unit: UnitType) => {
-    // Remove the added product from search results without triggering search
-    setProducts(prevProducts => {
-      const filtered = prevProducts.filter(p => p.id !== product.id);
-      return filtered;
-    });
-    
-    // Update cart synchronously without loading state
-    setCart(prevCart => {
-      const existingItemIndex = prevCart.findIndex(
-        item => item.product.id === product.id && item.unit === unit
-      );
-
-      if (existingItemIndex >= 0) {
-        return prevCart.map((item, idx) => {
-          if (idx === existingItemIndex) {
-            const newQuantity = item.quantity + 1;
-            return {
-              ...item,
-              quantity: newQuantity,
-              subtotal: newQuantity * (unit === 'box' ? product.retail_box_price : product.retail_price)
-            };
-          }
-          return item;
-        });
-      }
-
-      const price = unit === 'box' ? product.retail_box_price : product.retail_price;
-      
-      return [
-        ...prevCart,
-        {
-          product,
-          quantity: 1,
-          unit,
-          price,
-          subtotal: price
-        }
-      ];
-    });
-  }, []);
 
   // Handle barcode input changes
   useEffect(() => {
@@ -326,8 +473,6 @@ export default function NewTransactionPage() {
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      console.log('Session data:', JSON.stringify(session, null, 2));
-      console.log('User metadata:', session?.user?.user_metadata);
       
       // Try different possible fields for cashier ID
       const currentCashierId = session?.user?.user_metadata?.user_id || 
@@ -338,7 +483,6 @@ export default function NewTransactionPage() {
                                session?.user?.user_metadata?.name || 
                                'Admin';
       
-      console.log('Cashier ID:', currentCashierId, 'Name:', currentCashierName);
       setCashierName(currentCashierName);
 
       const cashierId = session?.user?.user_metadata?.user_id || '';
@@ -480,7 +624,8 @@ export default function NewTransactionPage() {
                 <div>
                   <Label htmlFor="barcode">Scan Barcode</Label>
                   <Input
-                    id="barcode"
+                    ref={barcodeInputRef}
+                    id="barcode-input"
                     placeholder="Scan barcode..."
                     value={barcodeInput}
                     onChange={(e) => setBarcodeInput(e.target.value)}
@@ -619,15 +764,32 @@ export default function NewTransactionPage() {
             </CardHeader>
             <CardContent className="h-full">
               <div className="space-y-4 flex flex-col h-full">
-                <div>
-                  <Label htmlFor="customer">Nama Pelanggan</Label>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="customer">Nama Pelanggan</Label>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="isReseller"
+                        checked={isReseller}
+                        onChange={(e) => setIsReseller(e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <Label htmlFor="isReseller" className="text-sm font-medium">
+                        Reseller
+                      </Label>
+                    </div>
+                  </div>
                   <Input
                     id="customer"
                     placeholder="Nama pelanggan..."
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
-                    className="mt-2"
+                    className="mt-0"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    {isReseller ? 'Harga Reseller' : 'Harga Normal'} akan diterapkan
+                  </p>
                 </div>
 
 
@@ -646,7 +808,9 @@ export default function NewTransactionPage() {
                             </span>
                           </div>
                           <div className="text-xs text-gray-600 mt-0.5">
-                            {item.unit === 'box' ? (
+                            {isReseller && item.product.reseller_price > 0 ? (
+                              <span className="text-red-600">Reseller: Rp{item.product.reseller_price.toLocaleString('id-ID')} / {item.unit === 'box' ? 'karton' : 'pcs'}</span>
+                            ) : item.unit === 'box' ? (
                               <span>Rp{item.product.retail_box_price.toLocaleString('id-ID')} / karton</span>
                             ) : item.quantity >= item.product.min_wholesale_qty ? (
                               <span className="text-green-600">Grosir: Rp{item.product.wholesale_price.toLocaleString('id-ID')} / pcs</span>

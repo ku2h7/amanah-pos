@@ -27,6 +27,7 @@ type FormData = {
   box_price: number;
   retail_price: number;
   retail_box_price: number;
+  reseller_price: number;
   wholesale_price: number;
   min_wholesale_qty: number | null;
   barcode: string | null;
@@ -47,6 +48,7 @@ export default function AddProductPage() {
     box_price: 0,    // Harga modal per karton
     retail_price: 0,  // Harga jual per pcs
     retail_box_price: 0, // Harga jual per karton
+    reseller_price: 0, // Harga jual reseller
     wholesale_price: 0,
     min_wholesale_qty: null,
     barcode: null,
@@ -127,7 +129,7 @@ export default function AddProductPage() {
     const { name, value } = e.target;
     
     // For numeric inputs, parse the value as integer
-    if (['karton_qty', 'qty_per_box', 'qty', 'min_wholesale_qty', 'box_price', 'cost_price'].includes(name)) {
+    if (['karton_qty', 'qty_per_box', 'qty', 'min_wholesale_qty', 'box_price', 'cost_price', 'retail_price', 'retail_box_price', 'wholesale_price', 'reseller_price'].includes(name)) {
       const numValue = value === '' ? 0 : parseNumber(value);
       
       setFormData(prev => {
@@ -174,7 +176,7 @@ export default function AddProductPage() {
     
     try {
       // Create a copy of formData and remove karton_qty as it's only for calculation
-      
+
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { karton_qty, ...dataToSave } = formData;
       
@@ -214,6 +216,7 @@ export default function AddProductPage() {
           box_price: 0,
           retail_price: 0,
           retail_box_price: 0,
+          reseller_price: 0,
           wholesale_price: 0,
           min_wholesale_qty: null,
           barcode: null,
@@ -446,7 +449,7 @@ export default function AddProductPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="min_wholesale_qty">Minimal Qty Grosir</Label>
+                  <Label htmlFor="min_wholesale_qty">Min. Qty Grosir Konsumen</Label>
                   <Input
                     id="min_wholesale_qty"
                     name="min_wholesale_qty"
@@ -467,7 +470,7 @@ export default function AddProductPage() {
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="retail_box_price" className="flex items-center gap-1">
                     Harga Jual <span className="text-xs italic text-muted-foreground">(eceran per karton / rtg / slop)</span>
@@ -497,8 +500,35 @@ export default function AddProductPage() {
                   )}
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="reseller_price" className="flex items-center gap-1">
+                    Harga Reseller <span className="text-xs italic text-muted-foreground">(harga untuk reseller)</span>
+                  </Label>
+                  <Input
+                    id="reseller_price"
+                    name="reseller_price"
+                    type="text"
+                    value={formatNumber(formData.reseller_price || 0)}
+                    onChange={handleNumberChange}
+                    onBlur={(e) => {
+                      const numValue = parseNumber(e.target.value);
+                      setFormData(prev => ({
+                        ...prev,
+                        reseller_price: numValue
+                      }));
+                    }}
+                    placeholder="Harga reseller"
+                    min="0"
+                  />                  
+                  {formData.box_price !== null && formData.box_price !== undefined && formData.box_price > 0 && (
+                    <div className="text-[11px] text-emerald-500 font-normal mt-1 space-y-0.5">
+                      <div>Harga +6%: {formatNumber(Math.round(formData.box_price * 1.06))}</div>
+                      <div>Khusus Rokok +5%: {formatNumber(Math.round(formData.box_price * 1.05))}</div>
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="wholesale_price" className="flex items-center gap-1">
-                    Harga Jual <span className="text-xs italic text-muted-foreground">(grosir minimum qty)</span>
+                    Harga Jual <span className="text-xs italic text-muted-foreground">(grosir konsumen)</span>
                   </Label>
                   <Input
                     id="wholesale_price"
@@ -520,7 +550,7 @@ export default function AddProductPage() {
                     <div className="text-[11px] text-blue-500 font-normal mt-1 space-y-0.5">
                       <div>Harga +5%: {formatNumber(Math.round(formData.cost_price * 1.05))}</div>
                       <div>Harga +8%: {formatNumber(Math.round(formData.cost_price * 1.08))}</div>
-                      <div>Khusus Rokok +3%: {formatNumber(Math.round(formData.cost_price * 1.03))}</div>
+                      <div>Kosongkan, khusus Rokok pakai harga per slop</div>
                     </div>
                   )}
                 </div>
@@ -545,10 +575,10 @@ export default function AddProductPage() {
                     min="0"
                   />                  
                   {formData.cost_price !== null && formData.cost_price !== undefined && formData.cost_price > 0 && (
-                    <div className="text-xs text-amber-600 font-medium mt-1 space-y-0.5">
+                    <div className="text-[11px] text-amber-600 font-medium mt-1 space-y-0.5">
                       <div>Harga +10%: {formatNumber(Math.round(formData.cost_price * 1.10))}</div>
                       <div>Harga +15%: {formatNumber(Math.round(formData.cost_price * 1.15))}</div>
-                      <div>Khusus Rokok +5%: {formatNumber(Math.round(formData.cost_price * 1.05))}</div>
+                      <div>Khusus Rokok Naik 1000 - 2000</div>
                     </div>
                   )}
                 </div>

@@ -74,9 +74,7 @@ export default function TransactionsPage() {
         setError(null);
         
         // Check auth session
-        console.log('Checking auth session...');
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        console.log('Auth session:', { session, sessionError });
         
         if (sessionError) {
           console.error('Auth session error:', sessionError);
@@ -84,7 +82,6 @@ export default function TransactionsPage() {
         }
         
         // Fetch transactions with their items and product details in a single query
-        console.log('Fetching transactions with items and products...');
         const { data: transactionsData, error: transactionsError } = await supabase
           .from('transactions')
           .select(`
@@ -100,8 +97,6 @@ export default function TransactionsPage() {
           `)
           .order('created_at', { ascending: false });
 
-        console.log('Transactions query result:', { transactionsData, transactionsError });
-        
         if (transactionsError) {
           console.error('Transactions query error:', transactionsError);
           throw transactionsError;
@@ -177,7 +172,6 @@ export default function TransactionsPage() {
           };
         });
         
-        console.log('Processed transactions data:', processedTransactions);
         setTransactions(processedTransactions);
         setFilteredTransactions(processedTransactions);
       } catch (error) {
