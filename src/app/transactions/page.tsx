@@ -74,6 +74,7 @@ export default function TransactionsPage() {
         setError(null);
         
         // Check auth session
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {

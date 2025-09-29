@@ -474,11 +474,6 @@ export default function NewTransactionPage() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       
-      // Try different possible fields for cashier ID
-      const currentCashierId = session?.user?.user_metadata?.user_id || 
-                             session?.user?.user_metadata?.sub || 
-                             session?.user?.id || 
-                             '';
       const currentCashierName = session?.user?.user_metadata?.full_name || 
                                session?.user?.user_metadata?.name || 
                                'Admin';
