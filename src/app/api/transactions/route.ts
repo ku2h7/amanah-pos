@@ -233,8 +233,6 @@ export async function POST(req: Request) {
       created_at: new Date().toISOString(),
     }));
 
-    console.log("Creating transaction items:", transactionItems);
-
     const { error: itemsError } = await supabase
       .from("transaction_items")
       .insert(transactionItems);
