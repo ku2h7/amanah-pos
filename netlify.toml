@@ -1,6 +1,7 @@
 [build]
-  command = "npm run build"
+  command = "npm install && npm run build"
   publish = ".next"
 
 [build.environment]
-  NPM_FLAGS="--legacy-peer-deps"
+  NETLIFY_USE_YARN = "false"
+  NPM_FLAGS = "--legacy-peer-deps"
