@@ -246,8 +246,7 @@ export default function NewTransactionPage() {
         })
       );
     }
-  }, [isReseller]);
-  // State and refs are already declared at the top of the component
+  }, [isReseller, cart.length]);
 
   // Reset form to initial state
   const resetForm = () => {
@@ -562,25 +561,19 @@ export default function NewTransactionPage() {
         // Clean up
         root.unmount();
         
+        // Reset form after a short delay to ensure print dialog appears
+        window.setTimeout(() => {
+          resetForm();
+        }, 500);
+        
       } catch (error) {
         console.error('Error saat mencetak struk/membuka laci:', error);
-        toast.error('Gagal membuka laci kasir', {
+        toast.error('Gagal mencetak struk', {
           description: 'Pastikan printer terhubung dengan benar',
         });
+        // Still reset the form even if printing fails
+        resetForm();
       }
-      
-      // Automatically print the receipt after a short delay to allow state updates
-      window.setTimeout(() => {
-        if (receiptRef.current) {
-          // Print without showing dialog
-          printReceipt(receiptRef.current);
-          
-          // Reset form after a short delay to ensure print dialog appears
-          window.setTimeout(() => {
-            resetForm();
-          }, 500);
-        }
-      }, 300);
 
     } catch (error) {
       console.error("Transaction error:", error);

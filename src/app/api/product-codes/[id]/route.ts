@@ -1,12 +1,11 @@
-// src/app/api/product-codes/[id]/route.ts
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 // GET by ID
-// @ts-expect-error - Context type will be handled at runtime
-export async function GET(request: Request, context) {
-  const { id } = context.params;
+export async function GET(request: Request, context: any) {
+  const id = context.params?.id;
   try {
     const supabase = createRouteHandlerClient({ cookies });
 
@@ -22,22 +21,53 @@ export async function GET(request: Request, context) {
     }
 
     return NextResponse.json(data);
-  } catch (err) {
-    console.error('Error fetching product code:', err);
+  } catch (error) {
+    console.error('Error fetching product code:', error);
     return NextResponse.json(
-      { error: 'Gagal mengambil kode produk' },
+      { error: 'Gagal memuat detail kode produk' },
       { status: 500 }
     );
   }
 }
 
-// DELETE by ID
-// @ts-expect-error - Context type will be handled at runtime
-export async function DELETE(request: Request, context) {
-  const { id } = context.params;
+export async function PUT(request: Request, context: any) {
+  const id = context.params?.id;
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const cookieStore = cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    
+    const { keyword, code_prefix, description } = await request.json();
 
+    if (!keyword || !code_prefix) {
+      return NextResponse.json(
+        { error: 'Keyword dan prefix kode harus diisi' },
+        { status: 400 }
+      );
+    }
+
+    const { error } = await supabase
+      .from('product_codes')
+      .update({ keyword, code_prefix, description })
+      .eq('id', Number(id));
+
+    if (error) throw error;
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error updating product code:', error);
+    return NextResponse.json(
+      { error: 'Gagal memperbarui kode produk' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: Request, context: any) {
+  const id = context.params?.id;
+  try {
+    const cookieStore = cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    
     const { error } = await supabase
       .from('product_codes')
       .delete()
@@ -45,9 +75,9 @@ export async function DELETE(request: Request, context) {
 
     if (error) throw error;
 
-    return new Response(null, { status: 204 });
-  } catch (err) {
-    console.error('Error deleting product code:', err);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting product code:', error);
     return NextResponse.json(
       { error: 'Gagal menghapus kode produk' },
       { status: 500 }

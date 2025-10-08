@@ -29,27 +29,6 @@ export async function GET() {
   }
 }
 
-async function findMatchingProductCode(productName: string) {
-  const supabase = createRouteHandlerClient({ cookies });
-  
-  // Get all product codes
-  const { data: codes, error: codesError } = await supabase
-    .from('product_codes')
-    .select('*');
-
-  if (codesError) {
-    console.error('Error fetching product codes:', codesError);
-    return null;
-  }
-
-  // Find the first code where the product name contains the keyword (case insensitive)
-  const matchedCode = codes.find(code => 
-    productName.toLowerCase().includes(code.keyword.toLowerCase())
-  );
-
-  return matchedCode || null;
-}
-
 async function generateProductId(prefix: string) {
   const supabase = createRouteHandlerClient({ cookies });
   
@@ -83,11 +62,52 @@ async function generateProductId(prefix: string) {
 
 export async function POST(request: Request) {
   try {
-    const cookieStore = cookies()
+    const cookieStore = cookies();
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-    const productData = await request.json();
     
-    // Round numeric values to ensure they are integers
+    // Parse and validate request body
+    let productData;
+    try {
+      productData = await request.json();
+      if (!productData || typeof productData !== 'object') {
+        throw new Error('Invalid request body');
+      }
+    } catch (error) {
+      console.error('Error parsing request body:', error);
+      return NextResponse.json(
+        { error: 'Invalid request body' },
+        { status: 400 }
+      );
+    }
+
+    // Validate required fields
+    if (!productData.name || !productData.category_id) {
+      return NextResponse.json(
+        { 
+          error: 'Nama produk dan kategori harus diisi',
+          missingFields: {
+            name: !productData.name,
+            category_id: !productData.category_id
+          },
+          receivedData: productData // Debug: tampilkan data yang diterima
+        },
+        { status: 400 }
+      );
+    }
+    
+    // Pastikan category_id adalah number
+    const categoryId = Number(productData.category_id);
+    if (isNaN(categoryId)) {
+      return NextResponse.json(
+        { 
+          error: 'Format kategori tidak valid',
+          receivedCategoryId: productData.category_id
+        },
+        { status: 400 }
+      );
+    }
+    
+    // Prepare data with type conversion and default values
     const roundedData = {
       ...productData,
       qty: Math.round(Number(productData.qty) || 0),
@@ -99,22 +119,52 @@ export async function POST(request: Request) {
       wholesale_price: Math.round(Number(productData.wholesale_price) || 0),
       reseller_price: Math.round(Number(productData.reseller_price) || 0),
       min_wholesale_qty: productData.min_wholesale_qty ? Math.round(Number(productData.min_wholesale_qty)) : null,
+      is_editable: Boolean(productData.is_editable),
+      supplier_id: productData.supplier_id || null,
+      barcode: productData.barcode || null,
+      exp_date: productData.exp_date || null
     };
     
-    // Find matching product code
-    const productCode = await findMatchingProductCode(roundedData.name);
+    console.log('Processing product data:', JSON.stringify(roundedData, null, 2));
     
-    let productId;
-    if (productCode) {
-      // Generate ID based on product code
-      productId = await generateProductId(productCode.code_prefix);
-      if (!productId) {
-        throw new Error('Gagal membuat ID produk');
-      }
-    } else {
-      // Fallback to UUID if no matching code found
-      productId = crypto.randomUUID();
+    // Get category code prefix
+    console.log('Fetching category with ID:', productData.category_id);
+    // Pastikan categoryId sudah di-convert ke number
+    const { data: categoryData, error: categoryError } = await supabase
+      .from('product_codes')
+      .select('code_prefix')
+      .eq('id', categoryId) // Gunakan categoryId yang sudah di-convert
+      .single();
+
+    if (categoryError || !categoryData) {
+      console.error('Error getting category:', {
+        error: categoryError,
+        categoryId: productData.category_id,
+        timestamp: new Date().toISOString()
+      });
+      return NextResponse.json(
+        { 
+          error: 'Kategori tidak valid atau tidak ditemukan',
+          details: categoryError?.message || 'Tidak ada detail error',
+          categoryId: productData.category_id
+        },
+        { status: 400 }
+      );
     }
+
+    console.log('Found category with prefix:', categoryData.code_prefix);
+    
+    // Generate product ID based on category code prefix
+    const productId = await generateProductId(categoryData.code_prefix);
+    if (!productId) {
+      console.error('Failed to generate product ID');
+      return NextResponse.json(
+        { error: 'Gagal membuat ID produk' },
+        { status: 500 }
+      );
+    }
+    
+    console.log('Generated product ID:', productId);
     
     const { data, error } = await supabase
       .from('products')
@@ -135,22 +185,29 @@ export async function POST(request: Request) {
         is_editable: roundedData.is_editable,
         supplier_id: roundedData.supplier_id
       }])
-      .select()
+      .select();
 
     if (error) {
       console.error('Error creating product:', error);
       return NextResponse.json(
-        { error: error.message },
+        { 
+          error: error.message,
+          details: error.details || 'Tidak ada detail tambahan',
+          hint: error.hint || 'Tidak ada petunjuk'
+        },
         { status: 400 }
       );
     }
 
-    return NextResponse.json(data[0], { status: 201 })
+    return NextResponse.json(data[0], { status: 201 });
   } catch (error) {
-    console.error('Error in POST /api/products:', error)
+    console.error('Error in POST /api/products:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Terjadi kesalahan internal server',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
-    )
+    );
   }
 }
