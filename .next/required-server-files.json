@@ -98,7 +98,7 @@
         "transform": "lodash/{{member}}"
       }
     },
-    "outputFileTracingRoot": "/Users/kukuh7/Kerjaan/Toko Sembako/amanah-app",
+    "outputFileTracingRoot": "/Users/kukuh7",
     "experimental": {
       "useSkewCookie": false,
       "cacheLife": {
@@ -287,11 +287,11 @@
     "bundlePagesRouterDependencies": false,
     "configFileName": "next.config.ts",
     "turbopack": {
-      "root": "/Users/kukuh7/Kerjaan/Toko Sembako/amanah-app"
+      "root": "/Users/kukuh7"
     }
   },
   "appDir": "/Users/kukuh7/Kerjaan/Toko Sembako/amanah-app",
-  "relativeAppDir": "",
+  "relativeAppDir": "Kerjaan/Toko Sembako/amanah-app",
   "files": [
     ".next/routes-manifest.json",
     ".next/server/pages-manifest.json",

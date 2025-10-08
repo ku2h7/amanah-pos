@@ -16,10 +16,10 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { PageHeader } from "@/components/page-header";
 
 type FormData = {
   name: string;
+  category: string;
   qty: number;
   karton_qty: number;
   qty_per_box: number;
@@ -34,6 +34,7 @@ type FormData = {
   exp_date: string | null;
   is_editable: boolean;
   supplier_id: string | null;
+  product_code?: string; // Will be auto-generated
 };
 
 export default function AddProductPage() {
@@ -41,6 +42,7 @@ export default function AddProductPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     name: '',
+    category: '',
     qty: 0,
     karton_qty: 0, // Jumlah karton
     qty_per_box: 1,  // Jumlah pcs per karton
@@ -59,34 +61,76 @@ export default function AddProductPage() {
 
   const [suppliers, setSuppliers] = useState<Array<{id: string, name: string}>>([]);
   const [loadingSuppliers, setLoadingSuppliers] = useState(true);
+  const [categories, setCategories] = useState<Array<{id: number, keyword: string, code_prefix: string}>>([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
 
-  // Fetch suppliers
+  // Fetch suppliers and categories
   useEffect(() => {
-    const fetchSuppliers = async () => {
+    const fetchData = async () => {
       try {
-        const response = await fetch('/api/suppliers');
-        if (!response.ok) {
-          throw new Error('Gagal memuat daftar supplier');
-        }
-        const data = await response.json();
-        setSuppliers(data);
+        // Fetch suppliers
+        const [suppliersRes, categoriesRes] = await Promise.all([
+          fetch('/api/suppliers'),
+          fetch('/api/product-codes')
+        ]);
+
+        if (!suppliersRes.ok) throw new Error('Gagal memuat daftar supplier');
+        if (!categoriesRes.ok) throw new Error('Gagal memuat daftar kategori');
+
+        const [suppliersData, categoriesData] = await Promise.all([
+          suppliersRes.json(),
+          categoriesRes.json()
+        ]);
+
+        // Urutkan kategori berdasarkan keyword (A-Z)
+        const sortedCategories = [...categoriesData].sort((a, b) => 
+          a.keyword.localeCompare(b.keyword, 'id', {sensitivity: 'base'})
+        );
+
+        setSuppliers(suppliersData);
+        setCategories(sortedCategories);
       } catch (error) {
-        console.error('Error fetching suppliers:', error);
-        toast.error('Gagal memuat daftar supplier');
+        console.error('Error fetching data:', error);
+        toast.error('Gagal memuat data yang diperlukan');
       } finally {
         setLoadingSuppliers(false);
+        setLoadingCategories(false);
       }
     };
 
-    fetchSuppliers();
+    fetchData();
   }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  // Generate product code based on selected category
+  const generateProductCode = (categoryId: string) => {
+    const category = categories.find(cat => cat.id.toString() === categoryId);
+    if (!category) {
+      console.error('Kategori tidak ditemukan');
+      return 'PRD-000';
+    }
+    
+    // Format: CODE_PREFIX-XXX (3 digit random)
+    const randomNum = Math.floor(100 + Math.random() * 900);
+    return `${category.code_prefix}-${randomNum}`;
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target as HTMLInputElement;
     
-    // Handle khusus untuk input stok
-    if (name === 'stock') {
-      const numValue = value === '' ? 0 : parseInt(value, 10) || 0;
+    if (type === 'checkbox') {
+      const target = e.target as HTMLInputElement;
+      setFormData(prev => ({
+        ...prev,
+        [name]: target.checked
+      }));
+      return;
+    }
+    
+    // Handle number inputs
+    if (type === 'number' || ['karton_qty', 'qty_per_box', 'qty', 'min_wholesale_qty', 
+        'box_price', 'cost_price', 'retail_price', 'retail_box_price', 
+        'wholesale_price', 'reseller_price'].includes(name)) {
+      const numValue = value === '' ? 0 : parseNumber(value);
       setFormData(prev => ({
         ...prev,
         [name]: numValue
@@ -94,25 +138,11 @@ export default function AddProductPage() {
       return;
     }
     
-    if (type === 'number') {
-      // Handle input number dengan format ribuan
-      const numValue = parseNumber(value);
-      setFormData(prev => ({
-        ...prev,
-        [name]: numValue
-      }));
-    } else if (type === 'checkbox') {
-      const target = e.target as HTMLInputElement;
-      setFormData(prev => ({
-        ...prev,
-        [name]: target.checked
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }));
-    }
+    // Handle text inputs
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   const formatNumber = (num: number | string | null | undefined): string => {
@@ -160,35 +190,45 @@ export default function AddProductPage() {
         
         return updatedData;
       });
-    } else {
-      // For price fields, keep the existing logic
-      const numValue = parseNumber(value);
-      setFormData(prev => ({
-        ...prev,
-        [name]: numValue
-      }));
     }
   };
 
   const handleSubmit = async (e: React.FormEvent, addNewAfterSave = false) => {
     e.preventDefault();
+    
+    if (!formData.name) {
+      toast.error('Nama produk harus diisi');
+      return;
+    }
+    
+    if (!formData.category) {
+      toast.error('Kategori produk harus dipilih');
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
+      // Generate product code based on selected category
+      const productCode = generateProductCode(formData.category);
+      
       // Create a copy of formData and remove karton_qty as it's only for calculation
-
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { karton_qty, ...dataToSave } = formData;
+      const { karton_qty, category, ...dataToSave } = formData;
       
       // Prepare data for submission
       const submissionData = {
         ...dataToSave,
+        category_id: Number(category), // Convert to number for API
+        product_code: productCode,
         // Convert empty strings to null for optional fields
         barcode: formData.barcode || null,
         exp_date: formData.exp_date || null,
         supplier_id: formData.supplier_id || null,
         min_wholesale_qty: formData.min_wholesale_qty || null
       };
+      
+      console.log('Submitting data:', submissionData); // Debug log
       
       const response = await fetch('/api/products', {
         method: 'POST',
@@ -197,18 +237,39 @@ export default function AddProductPage() {
         },
         body: JSON.stringify(submissionData),
       });
-
+      
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Gagal menyimpan produk');
       }
-
+      
       const result = await response.json();
+      
+      // Reset form after successful submission
+      setFormData({
+        name: '',
+        category: '',
+        qty: 0,
+        karton_qty: 0,
+        qty_per_box: 1,
+        cost_price: 0,
+        box_price: 0,
+        retail_price: 0,
+        retail_box_price: 0,
+        reseller_price: 0,
+        wholesale_price: 0,
+        min_wholesale_qty: null,
+        barcode: null,
+        exp_date: null,
+        is_editable: false,
+        supplier_id: null,
+      });
       
       if (addNewAfterSave) {
         // Reset form for new entry
         setFormData({
           name: '',
+          category: '',
           qty: 0,
           karton_qty: 0,
           qty_per_box: 1,
@@ -234,6 +295,7 @@ export default function AddProductPage() {
         router.refresh();
         toast.success(`Produk "${result.name || 'baru'}" berhasil ditambahkan`);
       }
+      
     } catch (error) {
       console.error('Error:', error);
       toast.error(error instanceof Error ? error.message : 'Gagal menyimpan produk');
@@ -243,27 +305,27 @@ export default function AddProductPage() {
   };
 
   return (
-    <div className="container mx-auto space-y-6">
-      <PageHeader 
-        title="Tambah Produk Baru"
-        className="flex flex-col md:flex-row md:items-center md:justify-between gap-4"
-      >
-        <Button asChild variant="outline">
-          <Link href="/products">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Kembali ke Daftar Produk
-          </Link>
-        </Button>
-      </PageHeader>
+    <div className="container mx-auto px-4 py-8">
+      <div className="mb-6">
+        <Link href="/products" className="flex items-center text-sm text-muted-foreground hover:text-foreground mb-2">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Kembali ke Daftar Produk
+        </Link>
+      </div>
 
-      <Card>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight">Tambah Produk Baru</h1>
+        <p className="text-muted-foreground">Tambah produk baru ke dalam sistem</p>
+      </div>
+      
+      <Card className="mb-6">
         <CardHeader>
           <CardTitle>Informasi Produk</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 gap-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Nama Produk</Label>
                   <Input
@@ -274,6 +336,43 @@ export default function AddProductPage() {
                     placeholder="Masukkan nama produk"
                     required
                   />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="category">Kategori <span className="text-red-500">*</span></Label>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) => {
+                      console.log('Category selected:', value);
+                      setFormData(prev => ({
+                        ...prev,
+                        category: value
+                      }));
+                    }}
+                    disabled={loadingCategories}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder={
+                        loadingCategories ? 'Memuat kategori...' : 'Pilih kategori'
+                      } />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((category) => (
+                        <SelectItem 
+                          key={category.id} 
+                          value={category.id.toString()}
+                        >
+                          <div className="flex items-center">
+                            <span className="font-medium">{category.keyword}</span>
+                            <span className="ml-2 text-xs text-muted-foreground">({category.code_prefix})</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {!formData.category && (
+                    <p className="text-sm text-red-500 mt-1">Kategori harus dipilih</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="supplier">Supplier</Label>
@@ -590,29 +689,35 @@ export default function AddProductPage() {
                   id="is_editable"
                   name="is_editable"
                   checked={formData.is_editable}
-                  onChange={handleChange}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    is_editable: e.target.checked
+                  }))}
                   className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                 />
-                <label htmlFor="is_editable" className="text-sm font-medium text-gray-700">
-                  Dapat diedit
-                </label>
+                <Label htmlFor="is_editable" className="text-sm font-medium text-gray-700">
+                  Produk dapat diedit
+                </Label>
               </div>
-              
-              <div className="flex justify-end gap-2 pt-4">
+
+              <div className="flex justify-end gap-2 pt-6">
                 <Button type="button" variant="outline" asChild>
                   <Link href="/products">Batal</Link>
                 </Button>
                 <Button 
                   type="button" 
                   variant="outline" 
-                  onClick={(e) => handleSubmit(e, true)}
+                  onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                    e.preventDefault();
+                    const formEvent = new Event('submit', { cancelable: true, bubbles: true }) as unknown as React.FormEvent<HTMLFormElement>;
+                    handleSubmit(formEvent, true);
+                  }}
                   disabled={isLoading}
                 >
                   {isLoading ? 'Menyimpan...' : 'Simpan & Tambah Baru'}
                 </Button>
                 <Button 
-                  type="button"
-                  onClick={(e) => handleSubmit(e, false)}
+                  type="submit"
                   disabled={isLoading}
                 >
                   {isLoading ? 'Menyimpan...' : 'Simpan Produk'}
