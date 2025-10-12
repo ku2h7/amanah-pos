@@ -67,6 +67,7 @@ export async function PUT(request: Request, context: any) {
     if (fetchError) throw fetchError;
 
     return NextResponse.json(updatedProduct);
+
   } catch (error) {
     console.error('Error updating product code:', error);
     return NextResponse.json(

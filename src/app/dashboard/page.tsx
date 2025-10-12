@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Package, Users, FileText, DollarSign, TrendingUp, CalendarClock, BarChart } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { supabase } from '@/lib/supabaseClient';
-
 interface Transaction {
   id: string;
   created_at: string;
@@ -14,7 +13,6 @@ interface Transaction {
   items?: unknown[];
   status?: string;
 }
-
 interface DashboardStats {
   totalProducts: number;
   totalSuppliers: number;

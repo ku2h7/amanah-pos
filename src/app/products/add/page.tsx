@@ -643,6 +643,34 @@ export default function AddProductPage() {
                     )}
                   </div>
                 )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="reseller_price" className="flex items-center gap-1">
+                    Harga Reseller <span className="text-xs italic text-muted-foreground">(harga untuk reseller)</span>
+                  </Label>
+                  <Input
+                    id="reseller_price"
+                    name="reseller_price"
+                    type="text"
+                    value={formatNumber(formData.reseller_price || 0)}
+                    onChange={handleNumberChange}
+                    onBlur={(e) => {
+                      const numValue = parseNumber(e.target.value);
+                      setFormData(prev => ({
+                        ...prev,
+                        reseller_price: numValue
+                      }));
+                    }}
+                    placeholder="Harga reseller"
+                    min="0"
+                  />                  
+                  {formData.box_price !== null && formData.box_price !== undefined && formData.box_price > 0 && (
+                    <div className="text-[11px] text-emerald-500 font-normal mt-1 space-y-0.5">
+                      <div>Harga +6%: {formatNumber(Math.round(formData.box_price * 1.06))}</div>
+                      <div>Khusus Rokok +5%: {formatNumber(Math.round(formData.box_price * 1.05))}</div>
+                    </div>
+                  )}
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="reseller_price" className="flex items-center gap-1">
                     Harga Reseller <span className="text-xs italic text-muted-foreground">(harga untuk reseller)</span>

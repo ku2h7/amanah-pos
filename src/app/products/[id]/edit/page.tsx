@@ -520,6 +520,28 @@ export default function EditProductPage() {
                     )}
                   </div>
                 )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="reseller_price" className="flex items-center gap-1">
+                    Harga Jual <span className="text-xs italic text-muted-foreground">(reseller per pcs)</span>
+                  </Label>
+                  <Input
+                    id="reseller_price"
+                    name="reseller_price"
+                    type="text"
+                    value={formatNumber(formData.reseller_price || 0)}
+                    onChange={handleNumberChange}
+                    onBlur={(e) => {
+                      const numValue = parseNumber(e.target.value);
+                      setFormData(prev => ({
+                        ...prev,
+                        reseller_price: numValue
+                      }));
+                    }}
+                    placeholder="Harga reseller"
+                    min="0"
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="reseller_price" className="flex items-center gap-1">
                     Harga Jual <span className="text-xs italic text-muted-foreground">(reseller per pcs)</span>
