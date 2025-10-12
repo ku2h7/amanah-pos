@@ -29,6 +29,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+#next
+.next
+
 # env files (can opt-in for committing if needed)
 .env*
 

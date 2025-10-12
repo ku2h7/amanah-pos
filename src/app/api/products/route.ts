@@ -182,6 +182,7 @@ export async function POST(request: Request) {
         min_wholesale_qty: roundedData.min_wholesale_qty,
         barcode: roundedData.barcode,
         exp_date: roundedData.exp_date,
+        units: roundedData.units || 'pcs',
         is_editable: roundedData.is_editable,
         supplier_id: roundedData.supplier_id
       }])

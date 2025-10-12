@@ -32,6 +32,7 @@ type FormData = {
   min_wholesale_qty: number | null;
   barcode: string | null;
   exp_date: string | null;
+  units: string;
   is_editable: boolean;
   supplier_id: string | null;
   product_code?: string; // Will be auto-generated
@@ -55,6 +56,7 @@ export default function AddProductPage() {
     min_wholesale_qty: null,
     barcode: null,
     exp_date: null,
+    units: 'pcs',
     is_editable: false,
     supplier_id: null,
   });
@@ -63,6 +65,17 @@ export default function AddProductPage() {
   const [loadingSuppliers, setLoadingSuppliers] = useState(true);
   const [categories, setCategories] = useState<Array<{id: number, keyword: string, code_prefix: string}>>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
+
+  // Helper function to get unit display name
+  const getUnitDisplayName = (unit: string) => {
+    switch (unit) {
+      case 'rtg': return 'Renteng';
+      case 'bal': return 'Bal';
+      case 'karton': return 'Karton';
+      case 'pcs': return 'Renteng'; // Default to Renteng as requested
+      default: return 'Renteng';
+    }
+  };
 
   // Fetch suppliers and categories
   useEffect(() => {
@@ -178,8 +191,8 @@ export default function AddProductPage() {
           updatedData.karton_qty = Math.floor(numValue / pcsPerBox);
         }
         
-        // Update cost price when box_price or qty_per_box changes
-        if (name === 'box_price' || name === 'qty_per_box') {
+        // Update cost price when box_price or qty_per_box changes (only if units is not 'pcs')
+        if ((name === 'box_price' || name === 'qty_per_box') && prev.units !== 'pcs') {
           const cartonPrice = name === 'box_price' ? numValue : prev.box_price || 0;
           const pcsCount = name === 'qty_per_box' ? Math.max(1, numValue) : Math.max(1, prev.qty_per_box || 1);
           
@@ -261,6 +274,7 @@ export default function AddProductPage() {
         min_wholesale_qty: null,
         barcode: null,
         exp_date: null,
+        units: 'pcs',
         is_editable: false,
         supplier_id: null,
       });
@@ -282,6 +296,7 @@ export default function AddProductPage() {
           min_wholesale_qty: null,
           barcode: null,
           exp_date: null,
+          units: 'pcs',
           is_editable: false,
           supplier_id: null,
         });
@@ -402,7 +417,7 @@ export default function AddProductPage() {
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="barcode">Barcode</Label>
                   <Input
@@ -433,52 +448,76 @@ export default function AddProductPage() {
                     className="w-full"
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="units">Satuan</Label>
+                  <Select
+                    value={formData.units}
+                    onValueChange={(value) => setFormData(prev => ({
+                      ...prev,
+                      units: value
+                    }))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Pilih satuan" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pcs">Pcs</SelectItem>
+                      <SelectItem value="rtg">Renteng (rtg)</SelectItem>
+                      <SelectItem value="bal">Bal</SelectItem>
+                      <SelectItem value="karton">Karton</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="karton_qty">Jumlah Karton</Label>
-                  <Input
-                    id="karton_qty"
-                    name="karton_qty"
-                    type="number"
-                    value={formData.karton_qty || ''}
-                    onChange={handleNumberChange}
-                    onBlur={(e) => {
-                      const value = e.target.value;
-                      const numValue = value === '' ? 0 : parseInt(value, 10) || 0;
-                      setFormData(prev => ({
-                        ...prev,
-                        karton_qty: numValue,
-                        qty: numValue * (prev.qty_per_box || 1)
-                      }));
-                    }}
-                    placeholder="Jumlah karton"
-                    min="0"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="qty_per_box">Pcs per Karton</Label>
-                  <Input
-                    id="qty_per_box"
-                    name="qty_per_box"
-                    type="number"
-                    value={formData.qty_per_box || ''}
-                    onChange={handleNumberChange}
-                    onBlur={(e) => {
-                      const value = e.target.value;
-                      const numValue = value === '' ? 1 : Math.max(1, parseInt(value, 10) || 1);
-                      setFormData(prev => ({
-                        ...prev,
-                        qty_per_box: numValue,
-                        qty: numValue * (prev.karton_qty || 0)
-                      }));
-                    }}
-                    placeholder="Pcs per karton"
-                    min="1"
-                    required
-                  />
-                </div>
+              <div className={`grid gap-4 ${formData.units === 'pcs' ? 'grid-cols-1' : 'grid-cols-3'}`}>
+                {formData.units !== 'pcs' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="karton_qty">Jumlah {getUnitDisplayName(formData.units)}</Label>
+                    <Input
+                      id="karton_qty"
+                      name="karton_qty"
+                      type="number"
+                      value={formData.karton_qty || ''}
+                      onChange={handleNumberChange}
+                      onBlur={(e) => {
+                        const value = e.target.value;
+                        const numValue = value === '' ? 0 : parseInt(value, 10) || 0;
+                        setFormData(prev => ({
+                          ...prev,
+                          karton_qty: numValue,
+                          qty: numValue * (prev.qty_per_box || 1)
+                        }));
+                      }}
+                      placeholder={`Jumlah ${getUnitDisplayName(formData.units).toLowerCase()}`}
+                      min="0"
+                    />
+                  </div>
+                )}
+                {formData.units !== 'pcs' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="qty_per_box">Pcs per {getUnitDisplayName(formData.units)}</Label>
+                    <Input
+                      id="qty_per_box"
+                      name="qty_per_box"
+                      type="number"
+                      value={formData.qty_per_box || ''}
+                      onChange={handleNumberChange}
+                      onBlur={(e) => {
+                        const value = e.target.value;
+                        const numValue = value === '' ? 1 : Math.max(1, parseInt(value, 10) || 1);
+                        setFormData(prev => ({
+                          ...prev,
+                          qty_per_box: numValue,
+                          qty: numValue * (prev.karton_qty || 0)
+                        }));
+                      }}
+                      placeholder={`Pcs per ${getUnitDisplayName(formData.units).toLowerCase()}`}
+                      min="1"
+                      required
+                    />
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="qty" className="flex items-center gap-1">
                     Total Stok <span className="text-xs italic text-muted-foreground">(pcs)</span>
@@ -486,12 +525,11 @@ export default function AddProductPage() {
                   <Input
                     id="qty"
                     name="qty"
-                    type="number"
-                    value={formData.qty}
+                    type="text"
+                    value={formatNumber(formData.qty)}
                     onChange={handleNumberChange}
                     onBlur={(e) => {
-                      const value = e.target.value;
-                      const numValue = value === '' ? 0 : parseInt(value, 10) || 0;
+                      const numValue = parseNumber(e.target.value);
                       setFormData(prev => ({
                         ...prev,
                         karton_qty: Math.floor(numValue / (prev.qty_per_box || 1)),
@@ -499,34 +537,35 @@ export default function AddProductPage() {
                       }));
                     }}
                     placeholder="Total stok"
-                    min="0"
                     required
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="box_price" className="flex items-center gap-1">
-                    Harga Modal <span className="text-xs italic text-muted-foreground">(per karton)</span>
-                  </Label>
-                  <Input
-                    id="box_price"
-                    name="box_price"
-                    type="text"
-                    value={formatNumber(formData.box_price)}
-                    onChange={handleNumberChange}
-                    onBlur={(e) => {
-                      const numValue = parseNumber(e.target.value);
-                      setFormData(prev => ({
-                        ...prev,
-                        box_price: numValue
-                      }));
-                    }}
-                    placeholder="Harga modal per karton"
-                    required
-                  />
-                </div>
+              <div className={`grid grid-cols-1 gap-4 ${formData.units === 'pcs' ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
+                {formData.units !== 'pcs' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="box_price" className="flex items-center gap-1">
+                      Harga Modal <span className="text-xs italic text-muted-foreground">(per {getUnitDisplayName(formData.units).toLowerCase()})</span>
+                    </Label>
+                    <Input
+                      id="box_price"
+                      name="box_price"
+                      type="text"
+                      value={formatNumber(formData.box_price)}
+                      onChange={handleNumberChange}
+                      onBlur={(e) => {
+                        const numValue = parseNumber(e.target.value);
+                        setFormData(prev => ({
+                          ...prev,
+                          box_price: numValue
+                        }));
+                      }}
+                      placeholder={`Harga modal per ${getUnitDisplayName(formData.units).toLowerCase()}`}
+                      required
+                    />
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="cost_price" className="flex items-center gap-1">
                     Harga Modal <span className="text-xs italic text-muted-foreground">(per pcs)</span>
@@ -537,13 +576,17 @@ export default function AddProductPage() {
                       name="cost_price"
                       type="text"
                       value={formatNumber(formData.cost_price)}
-                      readOnly
-                      className="bg-gray-100 cursor-not-allowed"
-                      placeholder="Otomatis dari harga karton / pcs"
+                      readOnly={formData.units !== 'pcs'}
+                      className={formData.units !== 'pcs' ? "bg-gray-100 cursor-not-allowed" : ""}
+                      placeholder={formData.units === 'pcs' ? "Masukkan harga modal per pcs" : `Otomatis dari harga ${getUnitDisplayName(formData.units).toLowerCase()} / pcs`}
+                      onChange={formData.units === 'pcs' ? handleNumberChange : undefined}
                       required
                     />
                     <div className="mt-1 text-xs text-muted-foreground">
-                      Dihitung otomatis dari Harga per karton / Jumlah pcs
+                      {formData.units === 'pcs' 
+                        ? "Masukkan harga modal per pcs secara manual"
+                        : `Dihitung otomatis dari Harga per ${getUnitDisplayName(formData.units).toLowerCase()} / Jumlah pcs`
+                      }
                     </div>
                   </div>
                 </div>
@@ -569,31 +612,61 @@ export default function AddProductPage() {
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className={`grid grid-cols-1 gap-4 ${formData.units === 'pcs' ? 'md:grid-cols-3' : 'md:grid-cols-4'}`}>
+                {formData.units !== 'pcs' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="retail_box_price" className="flex items-center gap-1">
+                      Harga Jual <span className="text-xs italic text-muted-foreground">(eceran per {getUnitDisplayName(formData.units).toLowerCase()})</span>
+                    </Label>
+                    <Input
+                      id="retail_box_price"
+                      name="retail_box_price"
+                      type="text"
+                      value={formatNumber(formData.retail_box_price)}
+                      onChange={handleNumberChange}
+                      onBlur={(e) => {
+                        const numValue = parseNumber(e.target.value);
+                        setFormData(prev => ({
+                          ...prev,
+                          retail_box_price: numValue
+                        }));
+                      }}
+                      placeholder={`Harga jual eceran per ${getUnitDisplayName(formData.units).toLowerCase()}`}
+                      min="0"
+                    />
+                    {formData.box_price !== null && formData.box_price !== undefined && formData.box_price > 0 && (
+                      <div className="text-[11px] text-emerald-500 font-normal mt-1 space-y-0.5">
+                        <div>Harga +4%: {formatNumber(Math.round(formData.box_price * 1.04))}</div>
+                        <div>Harga +5%: {formatNumber(Math.round(formData.box_price * 1.05))}</div>
+                        <div>Khusus Rokok +5%: {formatNumber(Math.round(formData.box_price * 1.05))}</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="space-y-2">
-                  <Label htmlFor="retail_box_price" className="flex items-center gap-1">
-                    Harga Jual <span className="text-xs italic text-muted-foreground">(eceran per karton / rtg / slop)</span>
+                  <Label htmlFor="reseller_price" className="flex items-center gap-1">
+                    Harga Reseller <span className="text-xs italic text-muted-foreground">(harga untuk reseller)</span>
                   </Label>
                   <Input
-                    id="retail_box_price"
-                    name="retail_box_price"
+                    id="reseller_price"
+                    name="reseller_price"
                     type="text"
-                    value={formatNumber(formData.retail_box_price)}
+                    value={formatNumber(formData.reseller_price || 0)}
                     onChange={handleNumberChange}
                     onBlur={(e) => {
                       const numValue = parseNumber(e.target.value);
                       setFormData(prev => ({
                         ...prev,
-                        retail_box_price: numValue
+                        reseller_price: numValue
                       }));
                     }}
-                    placeholder="Harga jual eceran per karton"
+                    placeholder="Harga reseller"
                     min="0"
-                  />
+                  />                  
                   {formData.box_price !== null && formData.box_price !== undefined && formData.box_price > 0 && (
                     <div className="text-[11px] text-emerald-500 font-normal mt-1 space-y-0.5">
-                      <div>Harga +4%: {formatNumber(Math.round(formData.box_price * 1.04))}</div>
-                      <div>Harga +5%: {formatNumber(Math.round(formData.box_price * 1.05))}</div>
+                      <div>Harga +6%: {formatNumber(Math.round(formData.box_price * 1.06))}</div>
                       <div>Khusus Rokok +5%: {formatNumber(Math.round(formData.box_price * 1.05))}</div>
                     </div>
                   )}
