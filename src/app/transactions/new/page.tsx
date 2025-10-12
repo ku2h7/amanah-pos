@@ -800,7 +800,9 @@ export default function NewTransactionPage() {
                               <span className="text-red-600">Reseller: Rp{item.product.reseller_price.toLocaleString('id-ID')} / {item.unit === 'box' ? 'karton' : 'pcs'}</span>
                             ) : item.unit === 'box' ? (
                               <span>Rp{item.product.retail_box_price.toLocaleString('id-ID')} / karton</span>
-                            ) : item.quantity >= item.product.min_wholesale_qty ? (
+                            ) : item.product.wholesale_price > 0 && 
+                               item.product.min_wholesale_qty > 0 && 
+                               item.quantity >= item.product.min_wholesale_qty ? (
                               <span className="text-green-600">Grosir: Rp{item.product.wholesale_price.toLocaleString('id-ID')} / pcs</span>
                             ) : (
                               <span className="text-amber-500">Eceran: Rp{item.price.toLocaleString('id-ID')} / pcs</span>

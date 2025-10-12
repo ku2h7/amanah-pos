@@ -6,6 +6,7 @@ import { Toaster } from "sonner"
 import "./globals.css";
 import { AuthProvider, useAuth } from "@/contexts/auth-context";
 import { Sidebar } from "@/components/sidebar";
+import { MainNav } from "@/components/main-nav";
 import { usePathname, redirect } from 'next/navigation';
 
 const inter = Inter({ 
@@ -30,15 +31,25 @@ function AuthLayout({ children }: { children: React.ReactNode }) {
 // Layout for dashboard pages
 function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen bg-background">
-      <div className="hidden md:flex">
-        <Sidebar />
+    <div className="flex flex-col min-h-screen bg-background">
+      {/* Mobile Navigation */}
+      <div className="md:hidden">
+        <MainNav />
       </div>
-      <main className="flex-1 overflow-auto h-screen pb-20 md:pb-0 bg-background">
-        <div className="p-4 md:p-6 max-w-7xl mx-auto">
-          {children}
+      
+      <div className="flex flex-1 overflow-hidden">
+        {/* Desktop Sidebar - hidden on mobile */}
+        <div className="hidden md:flex">
+          <Sidebar />
         </div>
-      </main>
+        
+        {/* Main Content */}
+        <main className="flex-1 overflow-auto h-screen pb-20 md:pb-0 bg-background">
+          <div className="p-4 md:p-6 max-w-7xl mx-auto">
+            {children}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

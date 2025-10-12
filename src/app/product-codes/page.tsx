@@ -61,54 +61,69 @@ const columns: ColumnDef<ProductCode>[] = [
   {
     id: 'actions',
     enableHiding: false,
-    cell: ({ row }) => {
+    cell: ({ row, table }) => {
       const productCode = row.original;
+      const { setProductCodes } = table.options.meta as { setProductCodes: (updater: (prev: ProductCode[]) => ProductCode[]) => void };
+      const { setEditingProduct, setIsEditDialogOpen } = table.options.meta as { 
+        setEditingProduct: (product: ProductCode) => void;
+        setIsEditDialogOpen: (isOpen: boolean) => void;
+      };
+
+      const handleDelete = async () => {
+        if (window.confirm('Apakah Anda yakin ingin menghapus kode produk ini?')) {
+          try {
+            const response = await fetch(`/api/product-codes/${productCode.id}`, {
+              method: 'DELETE',
+            });
+
+            if (!response.ok) {
+              throw new Error('Gagal menghapus kode produk');
+            }
+
+            // Update the state instead of reloading the page
+            setProductCodes(prev => prev.filter(p => p.id !== productCode.id));
+            toast.success('Kode produk berhasil dihapus');
+          } catch (error) {
+            console.error('Error deleting product code:', error);
+            toast.error('Gagal menghapus kode produk');
+          }
+        }
+      };
 
       return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={() => {
-                // TODO: Implement edit functionality
-                toast.info('Fitur edit akan segera hadir');
-              }}
-            >
-              <Pencil className="mr-2 h-4 w-4" />
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={async () => {
-                if (window.confirm('Apakah Anda yakin ingin menghapus kode produk ini?')) {
-                  try {
-                    const response = await fetch(`/api/product-codes/${productCode.id}`, {
-                      method: 'DELETE',
-                    });
-
-                    if (!response.ok) {
-                      throw new Error('Gagal menghapus kode produk');
-                    }
-
-                    window.location.reload();
-                    toast.success('Kode produk berhasil dihapus');
-                  } catch (error) {
-                    console.error('Error deleting product code:', error);
-                    toast.error('Gagal menghapus kode produk');
-                  }
-                }
-              }}
-              className="text-red-600"
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Hapus
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex justify-end">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem 
+                onClick={(e) => {
+                  e.preventDefault();
+                  setEditingProduct({...productCode});
+                  setIsEditDialogOpen(true);
+                }}
+                className="cursor-pointer"
+              >
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleDelete();
+                }}
+                className="text-red-600 cursor-pointer"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Hapus
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       );
     },
   },
@@ -123,6 +138,8 @@ export default function ProductCodesPage() {
   const [codePrefix, setCodePrefix] = React.useState('');
   const [description, setDescription] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
+  const [editingProduct, setEditingProduct] = React.useState<ProductCode | null>(null);
   const dialogTriggerRef = React.useRef<HTMLButtonElement>(null);
 
   React.useEffect(() => {
@@ -165,11 +182,14 @@ export default function ProductCodesPage() {
         throw new Error(errorData.error || 'Gagal menambahkan kode produk');
       }
 
-      const newCode = await response.json();
-      setProductCodes([...productCodes, newCode]);
+      // Refresh the product codes list
+      await fetchProductCodes();
+      
+      // Reset form
       setKeyword('');
       setCodePrefix('');
       setDescription('');
+      
       if (dialogTriggerRef.current) {
         dialogTriggerRef.current.focus();
       }
@@ -185,6 +205,11 @@ export default function ProductCodesPage() {
   const table = useReactTable({
     data: productCodes,
     columns,
+    meta: {
+      setProductCodes,
+      setEditingProduct,
+      setIsEditDialogOpen,
+    },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
@@ -347,6 +372,108 @@ export default function ProductCodesPage() {
           </Button>
         </div>
       </div>
+
+      {/* Edit Product Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Kode Produk</DialogTitle>
+            <DialogDescription>
+              Perbarui informasi kode produk
+            </DialogDescription>
+          </DialogHeader>
+          {editingProduct && (
+            <form 
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!editingProduct) return;
+                
+                setIsSubmitting(true);
+                try {
+                  const response = await fetch(`/api/product-codes/${editingProduct.id}`, {
+                    method: 'PUT',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      keyword: editingProduct.keyword,
+                      code_prefix: editingProduct.code_prefix,
+                      description: editingProduct.description || null,
+                    }),
+                  });
+
+                  if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Gagal memperbarui kode produk');
+                  }
+
+                  const updatedProduct = await response.json();
+                  setProductCodes(productCodes.map(p => 
+                    p.id === updatedProduct.id ? updatedProduct : p
+                  ));
+                  
+                  setIsEditDialogOpen(false);
+                  setEditingProduct(null);
+                  toast.success('Kode produk berhasil diperbarui');
+                } catch (error) {
+                  console.error('Error updating product code:', error);
+                  toast.error(error instanceof Error ? error.message : 'Gagal memperbarui kode produk');
+                } finally {
+                  setIsSubmitting(false);
+                }
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                <Label htmlFor="edit-keyword">Keyword</Label>
+                <Input
+                  id="edit-keyword"
+                  value={editingProduct.keyword}
+                  onChange={(e) => setEditingProduct({...editingProduct, keyword: e.target.value})}
+                  placeholder="Contoh: mie, beras, telur"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-code-prefix">Prefix Kode</Label>
+                <Input
+                  id="edit-code-prefix"
+                  value={editingProduct.code_prefix}
+                  onChange={(e) => setEditingProduct({...editingProduct, code_prefix: e.target.value.toUpperCase()})}
+                  placeholder="Contoh: MI, BR, TL"
+                  maxLength={5}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-description">Deskripsi (Opsional)</Label>
+                <Input
+                  id="edit-description"
+                  value={editingProduct.description || ''}
+                  onChange={(e) => setEditingProduct({...editingProduct, description: e.target.value || null})}
+                  placeholder="Contoh: Mie Instan, Beras, Telur"
+                />
+              </div>
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsEditDialogOpen(false);
+                    setEditingProduct(null);
+                  }}
+                  disabled={isSubmitting}
+                >
+                  Batal
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? 'Menyimpan...' : 'Simpan Perubahan'}
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

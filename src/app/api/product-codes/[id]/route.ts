@@ -45,14 +45,28 @@ export async function PUT(request: Request, context: any) {
       );
     }
 
+    // First update the record
     const { error } = await supabase
       .from('product_codes')
-      .update({ keyword, code_prefix, description })
+      .update({ 
+        keyword, 
+        code_prefix, 
+        description
+      })
       .eq('id', Number(id));
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true });
+    // Then fetch the updated record to return it
+    const { data: updatedProduct, error: fetchError } = await supabase
+      .from('product_codes')
+      .select('*')
+      .eq('id', Number(id))
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    return NextResponse.json(updatedProduct);
   } catch (error) {
     console.error('Error updating product code:', error);
     return NextResponse.json(

@@ -6,6 +6,15 @@ import { Package, Users, FileText, DollarSign, TrendingUp, CalendarClock, BarCha
 import { PageHeader } from '@/components/page-header';
 import { supabase } from '@/lib/supabaseClient';
 
+interface Transaction {
+  id: string;
+  created_at: string;
+  total_amount: number;
+  profit: number;
+  items?: unknown[];
+  status?: string;
+}
+
 interface DashboardStats {
   totalProducts: number;
   totalSuppliers: number;
@@ -63,6 +72,24 @@ export default function DashboardPage() {
           .select('*', { count: 'exact' })
           .gte('created_at', today.toISOString())
           .lt('created_at', tomorrow.toISOString());
+
+        // Log today's transaction details
+        console.log('=== Today\'s Transactions with Profit ===');
+        if (todayTransactions && todayTransactions.length > 0) {
+          todayTransactions.forEach((tx: Transaction) => {
+            console.log(`
+              Transaction ID: ${tx.id}
+              Date: ${new Date(tx.created_at).toLocaleString()}
+              Total Amount: ${tx.total_amount || 0}
+              Profit: ${tx.profit || 0}
+              Items: ${tx.items?.length || 0} items
+              Status: ${tx.status || 'N/A'}
+            `);
+          });
+          console.log(`\nTotal transactions today: ${todayTransactions.length}`);
+        } else {
+          console.log('No transactions found for today');
+        }
 
         // Fetch all transactions count
         const { count: totalTransactionsCount } = await supabase
