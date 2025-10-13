@@ -5081,7 +5081,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-next@latest:
+"next@npm:latest":
   version: 15.5.4
   resolution: "next@npm:15.5.4"
   dependencies:
