@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "ts-node --esm scripts/seed.ts",
-    "seed:admin": "NODE_OPTIONS='--loader ts-node/esm' tsx scripts/seed-admin.ts"
+    "seed:admin": "NODE_OPTIONS='--loader ts-node/esm' tsx scripts/seed-admin.ts",
+    "netlify-build": "rm -f yarn.lock && npm ci && npm run build"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.10",

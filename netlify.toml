@@ -1,17 +1,16 @@
 [build]
-  command = "npm ci && npm run build"
+  command = "npm run netlify-build"
   publish = ".next"
 
 [build.environment]
   NODE_VERSION = "20"
   NPM_FLAGS = "--legacy-peer-deps"
-  # Force npm usage
+  # Force npm usage and disable yarn
   NPM_CONFIG_PREFER_OFFLINE = "false"
   NPM_CONFIG_AUDIT = "false"
-
-# Disable yarn detection
-[build.processing]
-  skip_processing = false
+  YARN_ENABLE = "false"
+  USE_NPM = "true"
+  DISABLE_YARN = "true"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
