@@ -32,6 +32,9 @@ yarn-error.log*
 #next
 .next
 
+# yarn (use npm for deployment)
+yarn.lock
+
 # env files (can opt-in for committing if needed)
 .env*
 
