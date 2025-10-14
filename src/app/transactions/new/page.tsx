@@ -26,7 +26,7 @@ interface Product {
   qty_per_box: number;
   barcode: string | null;
   qty: number;
-  units: string;
+  units?: string;
 }
 
 type UnitType = 'pcs' | 'rtg' | 'bal' | 'karton' | 'ikat' | 'slop';
@@ -751,7 +751,7 @@ export default function NewTransactionPage() {
                                 <p>Eceran: Rp{product.retail_price.toLocaleString('id-ID')}</p>
                                 {product.qty_per_box > 1 && (
                                   <p className="text-amber-600">
-                                    {getUnitDisplayName(product.units)}: Rp{product.retail_box_price.toLocaleString('id-ID')} ({product.qty_per_box} pcs)
+                                    {getUnitDisplayName(product.units || 'karton')}: Rp{product.retail_box_price.toLocaleString('id-ID')} ({product.qty_per_box} pcs)
                                   </p>
                                 )}
                                 {product.min_wholesale_qty > 0 && (
@@ -775,10 +775,10 @@ export default function NewTransactionPage() {
                                 <Button 
                                   size="sm" 
                                   variant="outline"
-                                  onClick={() => addToCart(product, product.units as UnitType)}
+                                  onClick={() => addToCart(product, (product.units || 'karton') as UnitType)}
                                   className="gap-1 text-xs px-2 py-1 h-7"
                                 >
-                                  <Package className="h-3 w-3" /> {getUnitDisplayName(product.units)}
+                                  <Package className="h-3 w-3" /> {getUnitDisplayName(product.units || 'karton')}
                                 </Button>
                               )}
                             </div>
