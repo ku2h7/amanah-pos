@@ -26,14 +26,33 @@ interface Product {
   qty_per_box: number;
   barcode: string | null;
   qty: number;
+  units: string;
 }
 
-type UnitType = 'pcs' | 'box';
+type UnitType = 'pcs' | 'rtg' | 'bal' | 'karton' | 'ikat' | 'slop';
 
 export default function NewTransactionPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [editingItem, setEditingItem] = useState<number | null>(null);
   const [editedPrice, setEditedPrice] = useState<string>('');
+  
+  // Helper function to get unit display name
+  const getUnitDisplayName = (unit: string) => {
+    switch (unit) {
+      case 'rtg': return 'Renteng';
+      case 'bal': return 'Bal';
+      case 'karton': return 'Karton';
+      case 'ikat': return 'Ikat';
+      case 'slop': return 'Slop';
+      case 'pcs': return 'Pcs';
+      default: return 'Pcs';
+    }
+  };
+  
+  // Helper function to check if unit is bulk (not pcs)
+  const isBulkUnit = (unit: string) => {
+    return unit !== 'pcs';
+  };
   
   const [cart, setCart] = useState<Array<{
     product: Product;
@@ -128,17 +147,42 @@ export default function NewTransactionPage() {
         return prevCart.map((item, idx) => {
           if (idx === existingItemIndex) {
             const newQuantity = item.quantity + 1;
+            // Tentukan harga berdasarkan quantity baru
+            let price;
+            if (isReseller && product.reseller_price > 0) {
+              // Jika reseller, selalu gunakan harga reseller tanpa mempertimbangkan quantity
+              price = product.reseller_price;
+            } else if (isBulkUnit(unit)) {
+              price = product.retail_box_price;
+            } else if (unit === 'pcs' && product.min_wholesale_qty > 0 && newQuantity >= product.min_wholesale_qty) {
+              price = product.wholesale_price;
+            } else {
+              price = product.retail_price;
+            }
+            
             return {
               ...item,
               quantity: newQuantity,
-              subtotal: newQuantity * (unit === 'box' ? product.retail_box_price : product.retail_price)
+              price,
+              subtotal: newQuantity * price
             };
           }
           return item;
         });
       }
 
-      const price = unit === 'box' ? product.retail_box_price : product.retail_price;
+      // Tentukan harga berdasarkan unit dan kondisi
+      let price;
+      if (isReseller && product.reseller_price > 0) {
+        price = product.reseller_price;
+      } else if (isBulkUnit(unit)) {
+        price = product.retail_box_price;
+      } else if (unit === 'pcs' && product.min_wholesale_qty > 0 && 1 >= product.min_wholesale_qty) {
+        // Jika quantity 1 sudah memenuhi syarat grosir
+        price = product.wholesale_price;
+      } else {
+        price = product.retail_price;
+      }
       
       return [
         ...prevCart,
@@ -151,7 +195,7 @@ export default function NewTransactionPage() {
         }
       ];
     });
-  }, [setProducts, setCart]);
+  }, [setProducts, setCart, isReseller]);
 
   // Process barcode from scanner
   const processBarcode = useCallback((barcode: string) => {
@@ -232,11 +276,23 @@ export default function NewTransactionPage() {
     if (cart.length > 0) {
       setCart(prevCart => 
         prevCart.map(item => {
-          const price = isReseller && item.product.reseller_price > 0 
-            ? item.product.reseller_price 
-            : item.unit === 'box' 
-              ? item.product.retail_box_price 
-              : item.product.retail_price;
+          let price;
+          
+          if (isReseller && item.product.reseller_price > 0) {
+            // Jika reseller dan ada harga reseller, selalu gunakan harga reseller
+            price = item.product.reseller_price;
+          } else if (isBulkUnit(item.unit)) {
+            // Jika unit bulk (bukan pcs)
+            price = item.product.retail_box_price;
+          } else if (item.unit === 'pcs' && 
+                     item.product.min_wholesale_qty > 0 && 
+                     item.quantity >= item.product.min_wholesale_qty) {
+            // Jika pcs dan memenuhi syarat grosir (hanya jika bukan reseller)
+            price = item.product.wholesale_price;
+          } else {
+            // Default ke harga eceran
+            price = item.product.retail_price;
+          }
               
           return {
             ...item,
@@ -246,7 +302,7 @@ export default function NewTransactionPage() {
         })
       );
     }
-  }, [isReseller, cart.length]);
+  }, [isReseller]);
 
   // Reset form to initial state
   const resetForm = () => {
@@ -409,16 +465,21 @@ export default function NewTransactionPage() {
           }
           
           // Jika tidak ada harga custom, hitung ulang harga sesuai logika yang ada
-          let price = item.price;
+          let price;
           
-          if (unit === 'pcs' && item.product.min_wholesale_qty > 0) {
-            // Gunakan harga grosir jika memenuhi minimum
+          if (isReseller && item.product.reseller_price > 0) {
+            // Jika reseller, selalu gunakan harga reseller tanpa mempertimbangkan quantity
+            price = item.product.reseller_price;
+          } else if (isBulkUnit(unit)) {
+            // Tetap gunakan harga bulk unit
+            price = item.product.retail_box_price;
+          } else if (unit === 'pcs' && item.product.min_wholesale_qty > 0) {
+            // Gunakan harga grosir jika memenuhi minimum (hanya jika bukan reseller)
             price = newQuantity >= item.product.min_wholesale_qty 
               ? item.product.wholesale_price 
               : item.product.retail_price;
-          } else if (unit === 'box') {
-            // Tetap gunakan harga karton
-            price = item.product.retail_box_price;
+          } else {
+            price = item.product.retail_price;
           }
 
           return { 
@@ -690,7 +751,7 @@ export default function NewTransactionPage() {
                                 <p>Eceran: Rp{product.retail_price.toLocaleString('id-ID')}</p>
                                 {product.qty_per_box > 1 && (
                                   <p className="text-amber-600">
-                                    Karton: Rp{product.retail_box_price.toLocaleString('id-ID')} ({product.qty_per_box} pcs)
+                                    {getUnitDisplayName(product.units)}: Rp{product.retail_box_price.toLocaleString('id-ID')} ({product.qty_per_box} pcs)
                                   </p>
                                 )}
                                 {product.min_wholesale_qty > 0 && (
@@ -701,7 +762,7 @@ export default function NewTransactionPage() {
                                 <p className="text-gray-500">Stok: {product.qty} pcs</p>
                               </div>
                             </div>
-                            <div className="flex-shrink-0 flex gap-1">
+                            <div className="flex-shrink-0 flex flex-col gap-1">
                               <Button 
                                 size="sm" 
                                 variant="outline" 
@@ -714,10 +775,10 @@ export default function NewTransactionPage() {
                                 <Button 
                                   size="sm" 
                                   variant="outline"
-                                  onClick={() => addToCart(product, 'box')}
+                                  onClick={() => addToCart(product, product.units as UnitType)}
                                   className="gap-1 text-xs px-2 py-1 h-7"
                                 >
-                                  <Package className="h-3 w-3" /> Box
+                                  <Package className="h-3 w-3" /> {getUnitDisplayName(product.units)}
                                 </Button>
                               )}
                             </div>
@@ -790,16 +851,16 @@ export default function NewTransactionPage() {
                           <div className="flex items-baseline gap-2">
                             <p className="font-medium truncate text-sm">{item.product.name}</p>
                             <span className="text-xs text-gray-500 whitespace-nowrap">
-                              {item.unit === 'box' 
-                                ? `${item.quantity} karton × ${item.product.qty_per_box} pcs`
+                              {isBulkUnit(item.unit) 
+                                ? `${item.quantity} ${getUnitDisplayName(item.unit)} × ${item.product.qty_per_box} pcs`
                                 : `${item.quantity} pcs`}
                             </span>
                           </div>
                           <div className="text-xs text-gray-600 mt-0.5">
                             {isReseller && item.product.reseller_price > 0 ? (
-                              <span className="text-red-600">Reseller: Rp{item.product.reseller_price.toLocaleString('id-ID')} / {item.unit === 'box' ? 'karton' : 'pcs'}</span>
-                            ) : item.unit === 'box' ? (
-                              <span>Rp{item.product.retail_box_price.toLocaleString('id-ID')} / karton</span>
+                              <span className="text-red-600">Reseller: Rp{item.product.reseller_price.toLocaleString('id-ID')} / {isBulkUnit(item.unit) ? getUnitDisplayName(item.unit) : 'pcs'}</span>
+                            ) : isBulkUnit(item.unit) ? (
+                              <span>Rp{item.product.retail_box_price.toLocaleString('id-ID')} / {getUnitDisplayName(item.unit)}</span>
                             ) : item.product.wholesale_price > 0 && 
                                item.product.min_wholesale_qty > 0 && 
                                item.quantity >= item.product.min_wholesale_qty ? (
@@ -974,7 +1035,7 @@ export default function NewTransactionPage() {
                 retail_box_price: item.product.retail_box_price,
                 qty_per_box: item.product.qty_per_box
               },
-              quantity: item.unit === 'box' ? item.quantity * item.product.qty_per_box : item.quantity,
+              quantity: isBulkUnit(item.unit) ? item.quantity * item.product.qty_per_box : item.quantity,
               unit: item.unit,
               price: item.price,
               subtotal: item.subtotal
