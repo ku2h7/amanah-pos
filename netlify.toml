@@ -5,6 +5,10 @@
 [build.environment]
   NODE_VERSION = "20"
   NPM_FLAGS = "--legacy-peer-deps"
+  # Force disable Yarn
+  YARN_ENABLE = "false"
+  USE_NPM = "true"
+  DISABLE_YARN = "true"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
