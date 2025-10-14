@@ -93,7 +93,7 @@ const columns = (handleDelete: (id: string) => void): ColumnDef<Product>[] => [
   },
   {
     accessorKey: 'retail_box_price',
-    header: () => <div className="text-right">Harga Jual Karton</div>,
+    header: () => <div className="text-right">Harga Jual Unit</div>,
     cell: ({ row }) => {
       const amount = row.getValue('retail_box_price');
       if (!amount) return <div className="text-right">-</div>;

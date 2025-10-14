@@ -57,8 +57,10 @@ export default function EditProductPage() {
       case 'rtg': return 'Renteng';
       case 'bal': return 'Bal';
       case 'karton': return 'Karton';
-      case 'pcs': return 'Renteng'; // Default to Renteng as requested
-      default: return 'Renteng';
+      case 'ikat': return 'Ikat';
+      case 'slop': return 'Slop';
+      case 'pcs': return 'Pcs';
+      default: return 'Pcs';
     }
   };
 
@@ -341,6 +343,8 @@ export default function EditProductPage() {
                       <SelectItem value="rtg">Renteng (rtg)</SelectItem>
                       <SelectItem value="bal">Bal</SelectItem>
                       <SelectItem value="karton">Karton</SelectItem>
+                      <SelectItem value="ikat">Ikat</SelectItem>
+                      <SelectItem value="slop">Slop</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -521,27 +525,6 @@ export default function EditProductPage() {
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="reseller_price" className="flex items-center gap-1">
-                    Harga Jual <span className="text-xs italic text-muted-foreground">(reseller per pcs)</span>
-                  </Label>
-                  <Input
-                    id="reseller_price"
-                    name="reseller_price"
-                    type="text"
-                    value={formatNumber(formData.reseller_price || 0)}
-                    onChange={handleNumberChange}
-                    onBlur={(e) => {
-                      const numValue = parseNumber(e.target.value);
-                      setFormData(prev => ({
-                        ...prev,
-                        reseller_price: numValue
-                      }));
-                    }}
-                    placeholder="Harga reseller"
-                    min="0"
-                  />
-                </div>
                 <div className="space-y-2">
                   <Label htmlFor="reseller_price" className="flex items-center gap-1">
                     Harga Jual <span className="text-xs italic text-muted-foreground">(reseller per pcs)</span>
