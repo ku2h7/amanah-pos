@@ -9,7 +9,7 @@ const supabase = createClient(
 // @ts-expect-error - Context type will be handled at runtime
 export async function GET(request: Request, context) {
   try {
-    const { id } = context.params;
+    const { id } = await context.params;
     
     if (!id) {
       return NextResponse.json(

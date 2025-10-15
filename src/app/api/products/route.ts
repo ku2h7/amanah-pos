@@ -2,10 +2,9 @@ import { NextResponse } from 'next/server'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const cookieStore = cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const supabase = createRouteHandlerClient({ cookies });
     const { data, error } = await supabase
       .from('products')
       .select('*')
@@ -29,8 +28,7 @@ export async function GET() {
   }
 }
 
-async function generateProductId(prefix: string) {
-  const supabase = createRouteHandlerClient({ cookies });
+async function generateProductId(supabase: any, prefix: string) {
   
   // Find the latest product ID with this prefix
   const { data: latestProduct, error } = await supabase
@@ -62,8 +60,7 @@ async function generateProductId(prefix: string) {
 
 export async function POST(request: Request) {
   try {
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const supabase = createRouteHandlerClient({ cookies });
     
     // Parse and validate request body
     let productData;
@@ -155,7 +152,7 @@ export async function POST(request: Request) {
     console.log('Found category with prefix:', categoryData.code_prefix);
     
     // Generate product ID based on category code prefix
-    const productId = await generateProductId(categoryData.code_prefix);
+    const productId = await generateProductId(supabase, categoryData.code_prefix);
     if (!productId) {
       console.error('Failed to generate product ID');
       return NextResponse.json(

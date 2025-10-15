@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Minus, Trash2, Package, ArrowLeft } from "lucide-react";
+import { Plus, Minus, Trash2, Package, ArrowLeft, ShoppingCart, PackageSearch, SearchX, CheckCircle2 } from "lucide-react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -67,7 +67,6 @@ export default function NewTransactionPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [customerName, setCustomerName] = useState("");
-  const [barcodeInput, setBarcodeInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [amountPaid, setAmountPaid] = useState("");
   const [isReseller, setIsReseller] = useState(false);
@@ -83,39 +82,22 @@ export default function NewTransactionPage() {
   const receiptRef = useRef<HTMLDivElement>(null);
   const tempRef = useRef<HTMLDivElement | null>(null);
   const searchTimeout = useRef<number | null>(null);
-  const barcodeInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const lastBarcodeTime = useRef<number>(0);
   
   // Handle barcode scanner input
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Abaikan jika sedang fokus di input lain
-      if (document.activeElement?.tagName === 'INPUT' && document.activeElement.id !== 'barcode-input') {
+      const activeElement = document.activeElement as HTMLElement;
+      // Abaikan jika sedang fokus di input lain, kecuali input pencarian kita
+      if (activeElement?.tagName === 'INPUT' && activeElement.id !== 'search-input') {
         return;
       }
 
-      const now = Date.now();
-      
-      // Jika input adalah Enter, cari produk
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        // Hanya proses jika input terakhir lebih dari 100ms yang lalu (menghindari double input)
-        if (now - lastBarcodeTime.current > 100) {
-          lastBarcodeTime.current = now;
-          if (barcodeInput.trim()) {
-            // Trigger submit
-            const event = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13 });
-            barcodeInputRef.current?.dispatchEvent(event);
-          }
-        }
-        return;
-      } 
-      
-      // Jika input adalah karakter biasa, fokus ke input barcode
-      if (e.key.length === 1 && e.key !== ' ' && !e.ctrlKey && !e.metaKey) {
-        // Fokus ke input barcode jika belum fokus
-        if (document.activeElement?.id !== 'barcode-input' && barcodeInputRef.current) {
-          barcodeInputRef.current.focus();
+      // Jika input adalah karakter biasa, fokus ke input pencarian
+      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && activeElement.id !== 'search-input') {
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
         }
       }
     };
@@ -124,7 +106,7 @@ export default function NewTransactionPage() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [barcodeInput]);
+  }, []);
   
   // Supabase client
   const supabase = createClientComponentClient<Database>();
@@ -205,34 +187,22 @@ export default function NewTransactionPage() {
       addToCart(product, 'pcs');
       toast.success(`${product.name} ditambahkan ke keranjang`);
     } else {
-      // If no product found, set the barcode input field
-      setBarcodeInput(barcode);
-      // Focus on the barcode input field
-      const barcodeInput = document.getElementById('barcode-input') as HTMLInputElement;
-      if (barcodeInput) {
-        barcodeInput.focus();
-        barcodeInput.select();
+      // If no product found, set the search input field
+      setSearchTerm(barcode);
+      // Focus on the search input field
+      if (searchInputRef.current) {
+        searchInputRef.current.focus();
+        searchInputRef.current.select();
       }
     }
-  }, [products, addToCart]);
+  }, [products, addToCart, setSearchTerm]);
 
   // Handle global barcode scanner input
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Skip if user is typing in an input field
       const activeElement = document.activeElement as HTMLElement;
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(activeElement?.tagName)) {
-        // Only process Enter key in barcode input
-        if (activeElement.id !== 'barcode-input' || e.key !== 'Enter') {
-          return;
-        }
-        // If Enter is pressed in barcode input, process it manually
-        if (barcodeInput) {
-          e.preventDefault();
-          processBarcode(barcodeInput);
-          setBarcodeInput('');
-          return;
-        }
+        return;
       }
 
       // Reset buffer if last key was pressed more than 100ms ago
@@ -269,7 +239,7 @@ export default function NewTransactionPage() {
         barcodeTimer.current = null;
       }
     };
-  }, [processBarcode, barcodeInput]);
+  }, [processBarcode]);
 
   // Update harga di keranjang saat status reseller berubah
   useEffect(() => {
@@ -309,7 +279,6 @@ export default function NewTransactionPage() {
     setCart([]);
     setCustomerName("");
     setAmountPaid("");
-    setBarcodeInput("");
     setSearchTerm("");
     setTransactionComplete(false);
     setTransactionId("");
@@ -398,45 +367,6 @@ export default function NewTransactionPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm, supabase]);
 
-  // Handle barcode input changes
-  useEffect(() => {
-    const handleBarcodeInput = async () => {
-      if (!barcodeInput || (!barcodeInput.includes('\n') && !barcodeInput.includes('\r'))) return;
-      
-      const cleanBarcode = barcodeInput.replace(/[\n\r]/g, '').trim();
-      if (!cleanBarcode) return;
-
-      try {
-        const { data: product, error } = await supabase
-          .from('products')
-          .select('*')
-          .eq('barcode', cleanBarcode)
-          .single();
-
-        if (error) throw error;
-        
-        if (product) {
-          addToCart(product, 'pcs');
-          toast.success(`${product.name} ditambahkan ke keranjang`);
-          setBarcodeInput('');
-        } else {
-          toast.error('Produk tidak ditemukan');
-        }
-      } catch (error) {
-        console.error('Error handling barcode scan:', error);
-        toast.error('Terjadi kesalahan saat memindai barcode');
-      }
-      
-      // Always focus back to input
-      const barcodeInputElement = document.getElementById('barcode') as HTMLInputElement;
-      if (barcodeInputElement) {
-        barcodeInputElement.focus();
-        barcodeInputElement.selectionStart = barcodeInputElement.selectionEnd = barcodeInputElement.value.length;
-      }
-    };
-
-    handleBarcodeInput();
-  }, [barcodeInput, supabase, addToCart]);
 
 
 
@@ -576,10 +506,12 @@ export default function NewTransactionPage() {
       // Set transaction complete state and show print button
       setTransactionId(result.transaction.id);
       setTransactionComplete(true);
-      
-      // Try to open cash drawer using printer commands
+
+
+      // Print receipt setelah cash drawer
       try {
-        console.log('Mencoba membuka laci kasir...');
+        console.log('Mencetak struk...');
+        
         // Create a temporary div with the receipt content
         const tempDiv = document.createElement('div');
         tempRef.current = tempDiv;
@@ -616,7 +548,7 @@ export default function NewTransactionPage() {
         // Wait for the receipt to be rendered
         await new Promise(resolve => window.setTimeout(resolve, 100));
         
-        // Print the receipt which will include the cash drawer command
+        // Print the receipt
         await printReceipt(tempDiv);
         
         // Clean up
@@ -627,8 +559,8 @@ export default function NewTransactionPage() {
           resetForm();
         }, 500);
         
-      } catch (error) {
-        console.error('Error saat mencetak struk/membuka laci:', error);
+      } catch (printError) {
+        console.error('Error saat mencetak struk:', printError);
         toast.error('Gagal mencetak struk', {
           description: 'Pastikan printer terhubung dengan benar',
         });
@@ -653,12 +585,14 @@ export default function NewTransactionPage() {
         title="Transaksi Baru"
         className="flex flex-col md:flex-row md:items-center md:justify-between gap-4"
       >
-        <Button asChild variant="outline">
-          <Link href="/transactions">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Kembali ke Daftar Transaksi
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild variant="outline">
+            <Link href="/transactions">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Kembali ke Daftar Transaksi
+            </Link>
+          </Button>
+        </div>
       </PageHeader>
       
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 h-[calc(100vh-140px)]">
@@ -671,65 +605,52 @@ export default function NewTransactionPage() {
             <CardContent className="h-full">
               <div className="space-y-4 flex flex-col h-full">
                 <div>
-                  <Label htmlFor="barcode">Scan Barcode</Label>
+                  <Label htmlFor="search-input">Cari Produk atau Scan Barcode</Label>
                   <Input
-                    ref={barcodeInputRef}
-                    id="barcode-input"
-                    placeholder="Scan barcode..."
-                    value={barcodeInput}
-                    onChange={(e) => setBarcodeInput(e.target.value)}
+                    ref={searchInputRef}
+                    id="search-input"
+                    placeholder="Ketik nama produk atau scan barcode..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                     onKeyDown={async (e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
-                        const cleanBarcode = barcodeInput.trim();
-                        if (cleanBarcode) {
-                          // First, try to find the product in the current search results
-                          const productInResults = products.find(p => p.barcode === cleanBarcode);
-                          
-                          if (productInResults) {
-                            // If found in current results, add to cart immediately
-                            addToCart(productInResults, 'pcs');
-                            toast.success(`${productInResults.name} ditambahkan ke keranjang`);
-                            setBarcodeInput('');
-                          } else {
-                            // If not in current results, search in database
-                            try {
-                              const { data: product, error } = await supabase
-                                .from('products')
-                                .select('*')
-                                .eq('barcode', cleanBarcode)
-                                .single();
+                        const query = searchTerm.trim();
+                        if (!query) return;
 
-                              if (error) throw error;
-                              
-                              if (product) {
-                                addToCart(product, 'pcs');
-                                toast.success(`${product.name} ditambahkan ke keranjang`);
-                                setBarcodeInput('');
-                              } else {
-                                toast.error('Produk tidak ditemukan');
-                              }
-                            } catch (error) {
-                              console.error('Error:', error);
-                              toast.error('Terjadi kesalahan saat mencari produk');
+                        // Heuristic: if it's all numbers and long enough, it's a barcode.
+                        const isBarcode = /^\d{8,}$/.test(query);
+
+                        if (isBarcode) {
+                          try {
+                            const { data: product, error } = await supabase
+                              .from('products')
+                              .select('*')
+                              .eq('barcode', query)
+                              .single();
+
+                            if (error) throw error;
+                            
+                            if (product) {
+                              addToCart(product, 'pcs');
+                              toast.success(`${product.name} ditambahkan ke keranjang`);
+                              setSearchTerm(''); // Clear input after adding
+                            } else {
+                              toast.error('Produk dengan barcode tersebut tidak ditemukan');
                             }
+                          } catch (error) {
+                            console.error('Error searching barcode:', error);
+                            toast.error('Terjadi kesalahan saat mencari barcode');
                           }
+                        } else {
+                          // This will be handled by the useEffect that triggers search by name
+                          // We can force a search if needed, but the debounced one should suffice
+                          toast.info(`Mencari produk dengan nama "${query}"...`);
                         }
                       }
                     }}
                     autoComplete="off"
                     autoFocus
-                    className="mt-2 font-mono"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="search">Cari Produk</Label>
-                  <Input
-                    id="search"
-                    placeholder="Nama produk..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
                     className="mt-2"
                   />
                 </div>
@@ -786,18 +707,21 @@ export default function NewTransactionPage() {
                         </div>
                       ))
                     ) : searchResults.length > 0 ? (
-                      <div className="text-center py-8 text-gray-500">
-                        Semua produk sudah ditambahkan ke keranjang
+                      <div className="flex flex-col items-center justify-center text-center py-8 text-gray-500">
+                        <CheckCircle2 className="h-12 w-12 mb-3 text-green-500" />
+                        <p>Semua produk hasil pencarian<br/>sudah ada di keranjang.</p>
                       </div>
                     ) : (
-                      <div className="text-center py-8 text-gray-500">
-                        Produk tidak ditemukan
+                      <div className="flex flex-col items-center justify-center text-center py-8 text-gray-500">
+                        <SearchX className="h-12 w-12 mb-3 text-gray-400" />
+                        <p>Produk tidak ditemukan</p>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    Cari produk untuk memulai transaksi
+                  <div className="flex flex-col items-center justify-center text-center py-8 text-gray-500 h-full">
+                    <PackageSearch className="h-16 w-16 mb-4 text-gray-400" />
+                    <p>Cari produk untuk memulai transaksi</p>
                   </div>
                 )}
               </div>
@@ -951,8 +875,9 @@ export default function NewTransactionPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    Keranjang kosong
+                  <div className="flex flex-col items-center justify-center text-center py-8 text-gray-500 h-full">
+                    <ShoppingCart className="h-16 w-16 mb-4 text-gray-400" />
+                    <p>Keranjang kosong</p>
                   </div>
                 )}
 

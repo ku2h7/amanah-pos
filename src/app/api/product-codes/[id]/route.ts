@@ -5,7 +5,8 @@ import { NextResponse } from 'next/server';
 
 // GET by ID
 export async function GET(request: Request, context: any) {
-  const id = context.params?.id;
+  const params = await context.params;
+  const id = params?.id;
   try {
     const supabase = createRouteHandlerClient({ cookies });
 
@@ -31,10 +32,10 @@ export async function GET(request: Request, context: any) {
 }
 
 export async function PUT(request: Request, context: any) {
-  const id = context.params?.id;
+  const params = await context.params;
+  const id = params?.id;
   try {
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const supabase = createRouteHandlerClient({ cookies });
     
     const { keyword, code_prefix, description } = await request.json();
 
@@ -78,10 +79,10 @@ export async function PUT(request: Request, context: any) {
 }
 
 export async function DELETE(request: Request, context: any) {
-  const id = context.params?.id;
+  const params = await context.params;
+  const id = params?.id;
   try {
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const supabase = createRouteHandlerClient({ cookies });
     
     const { error } = await supabase
       .from('product_codes')

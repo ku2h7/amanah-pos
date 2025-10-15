@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabaseClient';
 // @ts-expect-error - Context type will be handled at runtime
 export async function GET(request: Request, context) {
   try {
-    const { id } = context.params;
+    const { id } = await context.params;
     const { data, error } = await supabase
       .from('products')
       .select('*')
@@ -27,7 +27,7 @@ export async function GET(request: Request, context) {
 // @ts-expect-error - Context type will be handled at runtime
 export async function PUT(request: Request, context) {
   try {
-    const { id } = context.params;
+    const { id } = await context.params;
     const productData = await request.json();
     
     // Round numeric values to ensure they are integers
@@ -82,7 +82,7 @@ export async function PUT(request: Request, context) {
 // @ts-expect-error - Context type will be handled at runtime
 export async function DELETE(request: Request, context) {
   try {
-    const { id } = context.params;
+    const { id } = await context.params;
     const { error } = await supabase
       .from('products')
       .delete()
