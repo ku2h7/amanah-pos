@@ -21,6 +21,7 @@ import { toast } from "sonner";
 type Product = {
   id: string;
   name: string;
+  category: number;
   qty: number;
   karton_qty: number; // Jumlah karton
   qty_per_box: number;  // Jumlah pcs per karton
@@ -43,6 +44,12 @@ type Supplier = {
   name: string;
 };
 
+type Category = {
+  id: number;
+  keyword: string;
+  code_prefix: string;
+};
+
 export default function EditProductPage() {
   const router = useRouter();
   const params = useParams();
@@ -50,6 +57,8 @@ export default function EditProductPage() {
   const [product, setProduct] = useState<Product | null>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loadingSuppliers, setLoadingSuppliers] = useState(true);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
 
   // Helper function to get unit display name
   const getUnitDisplayName = (unit: string) => {
@@ -57,32 +66,51 @@ export default function EditProductPage() {
       case 'rtg': return 'Renteng';
       case 'bal': return 'Bal';
       case 'karton': return 'Karton';
+      case 'karung': return 'Karung';
       case 'ikat': return 'Ikat';
       case 'slop': return 'Slop';
+      case 'kotak': return 'Kotak';
+      case 'tray': return 'Tray';
+      case 'strip': return 'Strip';
       case 'pcs': return 'Pcs';
       default: return 'Pcs';
     }
   };
 
-  // Fetch suppliers
+  // Fetch suppliers and categories
   useEffect(() => {
-    const fetchSuppliers = async () => {
+    const fetchData = async () => {
       try {
-        const response = await fetch('/api/suppliers');
-        if (!response.ok) {
-          throw new Error('Gagal memuat daftar supplier');
-        }
-        const data = await response.json();
-        setSuppliers(data);
+        const [suppliersRes, categoriesRes] = await Promise.all([
+          fetch('/api/suppliers'),
+          fetch('/api/product-codes')
+        ]);
+
+        if (!suppliersRes.ok) throw new Error('Gagal memuat daftar supplier');
+        if (!categoriesRes.ok) throw new Error('Gagal memuat daftar kategori');
+
+        const [suppliersData, categoriesData] = await Promise.all([
+          suppliersRes.json(),
+          categoriesRes.json()
+        ]);
+
+        // Urutkan kategori berdasarkan keyword (A-Z)
+        const sortedCategories = [...categoriesData].sort((a, b) => 
+          a.keyword.localeCompare(b.keyword, 'id', {sensitivity: 'base'})
+        );
+
+        setSuppliers(suppliersData);
+        setCategories(sortedCategories);
       } catch (error) {
-        console.error('Error fetching suppliers:', error);
-        toast.error('Gagal memuat daftar supplier');
+        console.error('Error fetching data:', error);
+        toast.error('Gagal memuat data yang diperlukan');
       } finally {
         setLoadingSuppliers(false);
+        setLoadingCategories(false);
       }
     };
 
-    fetchSuppliers();
+    fetchData();
   }, []);
 
   const [formData, setFormData] = useState<Partial<Product>>({
@@ -112,6 +140,7 @@ export default function EditProductPage() {
         const response = await fetch(`/api/products/${params.id}`);
         if (!response.ok) throw new Error('Failed to fetch product');
         const data = await response.json();
+        // console.log('Product data from API:', data); // Debug log
         setProduct(data);
         setFormData(data);
       } catch (error) {
@@ -199,6 +228,7 @@ export default function EditProductPage() {
           const cartonPrice = name === 'box_price' ? numValue : prev.box_price || 0;
           const pcsCount = name === 'qty_per_box' ? Math.max(1, numValue) : Math.max(1, prev.qty_per_box || 1);
           
+          // Calculate price per piece and round to nearest integer
           const pricePerPcs = Math.round(cartonPrice / pcsCount);
           updatedData.cost_price = pricePerPcs;
         }
@@ -259,7 +289,7 @@ export default function EditProductPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 gap-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Nama Produk</Label>
                   <Input
@@ -270,6 +300,40 @@ export default function EditProductPage() {
                     placeholder="Masukkan nama produk"
                     required
                   />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="category">Kategori <span className="text-red-500">*</span></Label>
+                  <Select
+                    value={formData.category?.toString() || ''}
+                    onValueChange={(value) => {
+                      // console.log('Category changed to:', value); // Debug log
+                      setFormData(prev => ({
+                        ...prev,
+                        category: Number(value)
+                      }));
+                    }}
+                    disabled={loadingCategories}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder={
+                        loadingCategories ? 'Memuat kategori...' : 'Pilih kategori'
+                      } />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-96">
+                      {categories.map((category) => (
+                        <SelectItem 
+                          key={category.id} 
+                          value={category.id.toString()}
+                        >
+                          <div className="flex items-center">
+                            <span className="font-medium">{category.keyword}</span>
+                            <span className="ml-2 text-xs text-muted-foreground">({category.code_prefix})</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="supplier">Supplier</Label>
@@ -343,8 +407,12 @@ export default function EditProductPage() {
                       <SelectItem value="rtg">Renteng (rtg)</SelectItem>
                       <SelectItem value="bal">Bal</SelectItem>
                       <SelectItem value="karton">Karton</SelectItem>
+                      <SelectItem value="karung">Karung</SelectItem>
+                      <SelectItem value="kotak">Kotak</SelectItem>
                       <SelectItem value="ikat">Ikat</SelectItem>
                       <SelectItem value="slop">Slop</SelectItem>
+                      <SelectItem value="tray">Tray</SelectItem>
+                      <SelectItem value="strip">Strip</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -438,8 +506,7 @@ export default function EditProductPage() {
                         const numValue = parseNumber(e.target.value);
                         setFormData(prev => ({
                           ...prev,
-                          box_price: numValue,
-                          cost_price: numValue / (prev.qty_per_box || 1)
+                          box_price: numValue
                         }));
                       }}
                       placeholder={`Harga modal per ${getUnitDisplayName(formData.units || 'pcs').toLowerCase()}`}
@@ -472,7 +539,7 @@ export default function EditProductPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="min_wholesale_qty">Minimal Qty Grosir</Label>
+                  <Label htmlFor="min_wholesale_qty">Min. Qty Grosir Konsumen</Label>
                   <Input
                     id="min_wholesale_qty"
                     name="min_wholesale_qty"
@@ -515,7 +582,7 @@ export default function EditProductPage() {
                       placeholder={`Harga jual eceran per ${getUnitDisplayName(formData.units || 'pcs').toLowerCase()}`}
                       min="0"
                     />
-                    {formData.box_price !== null && formData.box_price !== undefined && formData.box_price > 0 && (
+                      {formData.box_price !== null && formData.box_price !== undefined && formData.box_price > 0 && (
                       <div className="text-[11px] text-emerald-500 font-normal mt-1 space-y-0.5">
                         <div>Harga +4%: {formatNumber(Math.round(formData.box_price * 1.04))}</div>
                         <div>Harga +5%: {formatNumber(Math.round(formData.box_price * 1.05))}</div>
@@ -527,7 +594,7 @@ export default function EditProductPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="reseller_price" className="flex items-center gap-1">
-                    Harga Jual <span className="text-xs italic text-muted-foreground">(reseller per pcs)</span>
+                    Harga Jual <span className="text-xs italic text-muted-foreground">(reseller per {getUnitDisplayName(formData.units || 'pcs').toLowerCase()})</span>
                   </Label>
                   <Input
                     id="reseller_price"
@@ -545,6 +612,12 @@ export default function EditProductPage() {
                     placeholder="Harga reseller"
                     min="0"
                   />
+                  {formData.box_price !== null && formData.box_price !== undefined && formData.box_price > 0 && (
+                    <div className="text-[11px] text-emerald-500 font-normal mt-1 space-y-0.5">
+                      <div>Harga +6%: {formatNumber(Math.round(formData.box_price * 1.06))}</div>
+                      <div>Khusus Rokok +5%: {formatNumber(Math.round(formData.box_price * 1.05))}</div>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="wholesale_price" className="flex items-center gap-1">
@@ -569,7 +642,7 @@ export default function EditProductPage() {
                   {formData.cost_price !== null && formData.cost_price !== undefined && formData.cost_price > 0 && (
                     <div className="text-[11px] text-blue-500 font-normal mt-1 space-y-0.5">
                       <div>Harga +5%: {formatNumber(Math.round(formData.cost_price * 1.05))}</div>
-                      <div>Harga +10%: {formatNumber(Math.round(formData.cost_price * 1.10))}</div>
+                      <div>Harga +8%: {formatNumber(Math.round(formData.cost_price * 1.08))}</div>
                       <div>Kosongkan, khusus Rokok pakai harga per slop</div>
                     </div>
                   )}
@@ -614,9 +687,9 @@ export default function EditProductPage() {
                   onChange={handleChange}
                   className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                 />
-                <label htmlFor="is_editable" className="text-sm font-medium text-gray-700">
-                  Dapat diedit
-                </label>
+                <Label htmlFor="is_editable" className="text-sm font-medium text-gray-700">
+                  Produk dapat diedit
+                </Label>
               </div>
               
               <div className="flex justify-end gap-2 pt-4">

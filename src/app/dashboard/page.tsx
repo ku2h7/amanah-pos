@@ -13,6 +13,55 @@ interface Transaction {
   items?: unknown[];
   status?: string;
 }
+
+interface TransactionItemWithProduct {
+  product_id: string | null;
+  quantity: number | null;
+  subtotal: number | null;
+  price_per_unit: number | null;
+  unit: string | null;
+  qty_per_box: number | null;
+  transaction_id?: string | null;
+  products: {
+    cost_price: number | null;
+    qty_per_box: number | null;
+  } | {
+    cost_price: number | null;
+    qty_per_box: number | null;
+  }[] | null;
+}
+
+const calculateProfitForItem = (item: TransactionItemWithProduct): number => {
+  if (!item || typeof item.product_id !== 'string') {
+    return 0;
+  }
+
+  if (item.product_id.startsWith('SR-')) {
+    return 0;
+  }
+
+  const productDetails = Array.isArray(item.products)
+    ? item.products[0]
+    : item.products;
+  const costPrice = productDetails?.cost_price ?? 0;
+  const qtyPerBox = item.qty_per_box ?? productDetails?.qty_per_box ?? 1;
+  const normalizedQtyPerBox = qtyPerBox > 0 ? qtyPerBox : 1;
+  const quantity = item.quantity ?? 0;
+  const unit = item.unit ?? 'pcs';
+  const pricePerUnit = item.price_per_unit ?? 0;
+  const totalPieces = unit === 'box'
+    ? quantity * normalizedQtyPerBox
+    : quantity;
+  const sellingPricePerPiece = unit === 'box'
+    ? pricePerUnit / normalizedQtyPerBox
+    : pricePerUnit;
+  const profitPerPiece = sellingPricePerPiece - costPrice;
+  return profitPerPiece * totalPieces;
+};
+
+const calculateProfitFromItems = (items: TransactionItemWithProduct[]): number => {
+  return items.reduce((sum, item) => sum + calculateProfitForItem(item), 0);
+};
 interface DashboardStats {
   totalProducts: number;
   totalSuppliers: number;
@@ -96,19 +145,142 @@ export default function DashboardPage() {
 
         // Calculate today's revenue and profit
         const todayRevenue = todayTransactions?.reduce((sum, t) => sum + (t.total_amount || 0), 0) || 0;
-        
-        // For demo, assuming 30% profit margin
-        const todayProfit = todayRevenue * 0.3;
+
+        let todayProfit = 0;
+
+        if (todayTransactions && todayTransactions.length > 0) {
+          const transactionIds = todayTransactions.map((t: Transaction) => t.id);
+
+          if (transactionIds.length > 0) {
+            const { data: todayTransactionItems, error: todayTransactionItemsError } = await supabase
+              .from('transaction_items')
+              .select(`
+                product_id,
+                quantity,
+                subtotal,
+                price_per_unit,
+                unit,
+                qty_per_box,
+                transaction_id,
+                products (
+                  cost_price,
+                  qty_per_box
+                )
+              `)
+              .in('transaction_id', transactionIds);
+
+            if (todayTransactionItemsError) {
+              console.error('Error fetching today transaction items:', todayTransactionItemsError);
+            } else if (todayTransactionItems) {
+              const typedItems = todayTransactionItems as TransactionItemWithProduct[];
+              const profitByTransaction = new Map<string, number>();
+
+              typedItems.forEach(item => {
+                const profit = calculateProfitForItem(item);
+                if (!item.transaction_id) {
+                  return;
+                }
+
+                const current = profitByTransaction.get(item.transaction_id) ?? 0;
+                profitByTransaction.set(item.transaction_id, current + profit);
+              });
+
+              console.log('=== Profit per transaction (Today) ===');
+              transactionIds.forEach(id => {
+                const profit = profitByTransaction.get(id) ?? 0;
+                console.log(`Transaksi ${id}: ${formatCurrency(profit)}`);
+              });
+
+              todayProfit = calculateProfitFromItems(typedItems);
+            }
+          }
+        }
 
         // Fetch monthly transactions for profit calculation
         const { data: monthlyTransactions } = await supabase
           .from('transactions')
-          .select('total_amount')
+          .select('id, total_amount, created_at')
           .gte('created_at', firstDayOfMonth.toISOString())
           .lte('created_at', lastDayOfMonth.toISOString());
 
         const monthlyRevenue = monthlyTransactions?.reduce((sum, t) => sum + (t.total_amount || 0), 0) || 0;
-        const monthlyProfit = monthlyRevenue * 0.3; // 30% profit margin
+        let monthlyProfit = 0;
+
+        if (monthlyTransactions && monthlyTransactions.length > 0) {
+          const monthlyTransactionIds = monthlyTransactions.map(t => t.id);
+          const transactionDateMap = new Map<string, string>();
+          monthlyTransactions.forEach(t => {
+            if (t.id && t.created_at) {
+              transactionDateMap.set(t.id, t.created_at);
+            }
+          });
+
+          if (monthlyTransactionIds.length > 0) {
+            const { data: monthlyTransactionItems, error: monthlyTransactionItemsError } = await supabase
+              .from('transaction_items')
+              .select(`
+                product_id,
+                quantity,
+                subtotal,
+                price_per_unit,
+                unit,
+                qty_per_box,
+                transaction_id,
+                products (
+                  cost_price,
+                  qty_per_box
+                )
+              `)
+              .in('transaction_id', monthlyTransactionIds);
+
+            if (monthlyTransactionItemsError) {
+              console.error('Error fetching monthly transaction items:', monthlyTransactionItemsError);
+            } else if (monthlyTransactionItems) {
+              const typedMonthlyItems = monthlyTransactionItems as TransactionItemWithProduct[];
+              const profitByTransaction = new Map<string, number>();
+
+              typedMonthlyItems.forEach(item => {
+                const profit = calculateProfitForItem(item);
+                if (!item.transaction_id) {
+                  return;
+                }
+
+                const current = profitByTransaction.get(item.transaction_id) ?? 0;
+                profitByTransaction.set(item.transaction_id, current + profit);
+              });
+
+              console.log('=== Profit per transaction (Current Month) ===');
+              monthlyTransactionIds.forEach(id => {
+                const profit = profitByTransaction.get(id) ?? 0;
+                console.log(`Transaksi ${id}: ${formatCurrency(profit)}`);
+              });
+
+              const profitByDate = new Map<string, number>();
+              monthlyTransactionIds.forEach(id => {
+                const profit = profitByTransaction.get(id) ?? 0;
+                const createdAt = transactionDateMap.get(id);
+                if (!createdAt) {
+                  return;
+                }
+
+                const dateKey = new Date(createdAt).toISOString().slice(0, 10);
+                const current = profitByDate.get(dateKey) ?? 0;
+                profitByDate.set(dateKey, current + profit);
+              });
+
+              if (profitByDate.size > 0) {
+                console.log('=== Profit per day (Current Month) ===');
+                Array.from(profitByDate.entries())
+                  .sort(([a], [b]) => a.localeCompare(b))
+                  .forEach(([date, profit]) => {
+                    console.log(`${date}: ${formatCurrency(profit)}`);
+                  });
+              }
+
+              monthlyProfit = calculateProfitFromItems(typedMonthlyItems);
+            }
+          }
+        }
 
         // Fetch all transactions for total profit calculation
         const { data: allTransactions } = await supabase

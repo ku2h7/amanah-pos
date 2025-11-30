@@ -72,8 +72,12 @@ export default function AddProductPage() {
       case 'rtg': return 'Renteng';
       case 'bal': return 'Bal';
       case 'karton': return 'Karton';
+      case 'karung': return 'Karung';
       case 'ikat': return 'Ikat';
       case 'slop': return 'Slop';
+      case 'kotak': return 'Kotak';
+      case 'tray': return 'Tray';
+      case 'strip': return 'Strip';
       case 'pcs': return 'Pcs';
       default: return 'Pcs';
     }
@@ -229,12 +233,12 @@ export default function AddProductPage() {
       
       // Create a copy of formData and remove karton_qty as it's only for calculation
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { karton_qty, category, ...dataToSave } = formData;
+      const { karton_qty, ...dataToSave } = formData;
       
       // Prepare data for submission
       const submissionData = {
         ...dataToSave,
-        category_id: Number(category), // Convert to number for API
+        category: Number(formData.category), // Convert to number for API
         product_code: productCode,
         // Convert empty strings to null for optional fields
         barcode: formData.barcode || null,
@@ -373,7 +377,7 @@ export default function AddProductPage() {
                         loadingCategories ? 'Memuat kategori...' : 'Pilih kategori'
                       } />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="max-h-96">
                       {categories.map((category) => (
                         <SelectItem 
                           key={category.id} 
@@ -467,8 +471,12 @@ export default function AddProductPage() {
                       <SelectItem value="rtg">Renteng (rtg)</SelectItem>
                       <SelectItem value="bal">Bal</SelectItem>
                       <SelectItem value="karton">Karton</SelectItem>
+                      <SelectItem value="karung">Karung</SelectItem>
+                      <SelectItem value="kotak">Kotak</SelectItem>
                       <SelectItem value="ikat">Ikat</SelectItem>
                       <SelectItem value="slop">Slop</SelectItem>
+                      <SelectItem value="tray">Tray</SelectItem>
+                      <SelectItem value="strip">Strip</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -650,7 +658,7 @@ export default function AddProductPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="reseller_price" className="flex items-center gap-1">
-                    Harga Reseller <span className="text-xs italic text-muted-foreground">(harga untuk reseller)</span>
+                    Harga Jual <span className="text-xs italic text-muted-foreground">(reseller per {getUnitDisplayName(formData.units).toLowerCase()})</span>
                   </Label>
                   <Input
                     id="reseller_price"

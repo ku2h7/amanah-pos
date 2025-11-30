@@ -48,6 +48,7 @@ export async function PUT(request: Request, context) {
       .from('products')
       .update({
         name: roundedData.name,
+        category: roundedData.category,
         qty: roundedData.qty,
         cost_price: roundedData.cost_price,
         box_price: roundedData.box_price,
@@ -61,6 +62,7 @@ export async function PUT(request: Request, context) {
         exp_date: roundedData.exp_date,
         supplier_id: roundedData.supplier_id,
         is_editable: roundedData.is_editable,
+        units: roundedData.units,
         updated_at: new Date().toISOString()
       })
       .eq('id', id)

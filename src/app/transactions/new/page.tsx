@@ -29,7 +29,7 @@ interface Product {
   units?: string;
 }
 
-type UnitType = 'pcs' | 'rtg' | 'bal' | 'karton' | 'ikat' | 'slop';
+type UnitType = 'pcs' | 'rtg' | 'bal' | 'karton' | 'karung' | 'ikat' | 'slop';
 
 export default function NewTransactionPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -42,8 +42,12 @@ export default function NewTransactionPage() {
       case 'rtg': return 'Renteng';
       case 'bal': return 'Bal';
       case 'karton': return 'Karton';
+      case 'karung': return 'Karung';
       case 'ikat': return 'Ikat';
       case 'slop': return 'Slop';
+      case 'kotak': return 'Kotak';
+      case 'tray': return 'Tray';
+      case 'strip': return 'Strip';
       case 'pcs': return 'Pcs';
       default: return 'Pcs';
     }
@@ -84,6 +88,7 @@ export default function NewTransactionPage() {
   const searchTimeout = useRef<number | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const lastBarcodeTime = useRef<number>(0);
+  const lastInputTime = useRef<number>(0);
   
   // Handle barcode scanner input
   useEffect(() => {
@@ -95,9 +100,15 @@ export default function NewTransactionPage() {
       }
 
       // Jika input adalah karakter biasa, fokus ke input pencarian
-      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && activeElement.id !== 'search-input') {
-        if (searchInputRef.current) {
+      if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        if (searchInputRef.current && !searchInputRef.current.matches(':focus')) {
+          // Clear existing search term ketika mulai input baru
+          setSearchTerm('');
           searchInputRef.current.focus();
+          // Tambahkan karakter ke input
+          setTimeout(() => {
+            setSearchTerm(e.key);
+          }, 0);
         }
       }
     };
@@ -280,6 +291,8 @@ export default function NewTransactionPage() {
     setCustomerName("");
     setAmountPaid("");
     setSearchTerm("");
+    setIsReseller(false);
+    setTriedSubmit(false);
     setTransactionComplete(false);
     setTransactionId("");
   };
@@ -611,7 +624,29 @@ export default function NewTransactionPage() {
                     id="search-input"
                     placeholder="Ketik nama produk atau scan barcode..."
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      const currentValue = searchTerm;
+                      
+                      // Deteksi barcode scanner: jika sebelumnya ada text dan sekarang tiba-tiba jadi angka panjang
+                      const previousWasText = currentValue.length > 0 && !/^\d+$/.test(currentValue);
+                      const newIsLongNumber = /^\d{8,}$/.test(newValue);
+                      
+                      // Jika sebelumnya text dan sekarang tiba-tiba jadi barcode panjang = scanner input
+                      if (previousWasText && newIsLongNumber) {
+                        // Kemungkinan barcode scanner, replace semuanya
+                        setSearchTerm(newValue);
+                      } else {
+                        // Input normal
+                        setSearchTerm(newValue);
+                      }
+                    }}
+                    onFocus={() => {
+                      // Clear keyword ketika field di-focus (user click untuk search baru)
+                      if (searchTerm.length > 0) {
+                        setSearchTerm('');
+                      }
+                    }}
                     onKeyDown={async (e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -661,7 +696,7 @@ export default function NewTransactionPage() {
                     <span className="ml-2">Mencari produk...</span>
                   </div>
                 ) : searchTerm ? (
-                  <div className="mt-4 space-y-2 flex-1 overflow-y-auto pr-2 max-h-[calc(100vh-370px)]">
+                  <div className="search-results mt-4 space-y-2 flex-1 overflow-y-auto pr-2 max-h-[calc(100vh-370px)]">
                     {products.length > 0 ? (
                       products.map((product) => (
                         <div key={product.id} className="group p-2 border rounded-lg hover:bg-gray-800 transition-colors">
@@ -692,7 +727,7 @@ export default function NewTransactionPage() {
                               >
                                 <Plus className="h-3 w-3" /> Pcs
                               </Button>
-                              {product.qty_per_box > 1 && (
+                              {product.qty_per_box > 1 && (!product.units || isBulkUnit(product.units)) && (
                                 <Button 
                                   size="sm" 
                                   variant="outline"
