@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
-export async function GET(request: Request) {
+export const runtime = 'nodejs'
+
+export async function GET() {
   try {
     const supabase = await createClient();
     const { data, error } = await supabase
@@ -27,7 +30,7 @@ export async function GET(request: Request) {
   }
 }
 
-async function generateProductId(supabase: any, prefix: string) {
+async function generateProductId(supabase: SupabaseClient, prefix: string) {
   
   // Find the latest product ID with this prefix
   const { data: latestProduct, error } = await supabase

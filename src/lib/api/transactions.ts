@@ -1,5 +1,4 @@
 import { createClient } from '@/utils/supabase/client';
-import type { Database } from '@/lib/database.types';
 
 export interface TransactionItemPayload {
   product_id: string | number;   // Changed from number to string to match UUID

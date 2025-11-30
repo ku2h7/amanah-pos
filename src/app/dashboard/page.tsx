@@ -202,8 +202,6 @@ export default function DashboardPage() {
           .select('id, total_amount, created_at')
           .gte('created_at', firstDayOfMonth.toISOString())
           .lte('created_at', lastDayOfMonth.toISOString());
-
-        const monthlyRevenue = monthlyTransactions?.reduce((sum, t) => sum + (t.total_amount || 0), 0) || 0;
         let monthlyProfit = 0;
 
         if (monthlyTransactions && monthlyTransactions.length > 0) {

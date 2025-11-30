@@ -19,13 +19,6 @@ import {
 } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 
-interface LoginFormState {
-  email: string;
-  password: string;
-  loading: boolean;
-  error: string | null;
-}
-
 export default function LoginPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();

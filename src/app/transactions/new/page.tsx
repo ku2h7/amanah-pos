@@ -87,8 +87,6 @@ export default function NewTransactionPage() {
   const tempRef = useRef<HTMLDivElement | null>(null);
   const searchTimeout = useRef<number | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const lastBarcodeTime = useRef<number>(0);
-  const lastInputTime = useRef<number>(0);
   
   // Handle barcode scanner input
   useEffect(() => {
@@ -254,35 +252,39 @@ export default function NewTransactionPage() {
 
   // Update harga di keranjang saat status reseller berubah
   useEffect(() => {
-    if (cart.length > 0) {
-      setCart(prevCart => 
-        prevCart.map(item => {
-          let price;
-          
-          if (isReseller && item.product.reseller_price > 0) {
-            // Jika reseller dan ada harga reseller, selalu gunakan harga reseller
-            price = item.product.reseller_price;
-          } else if (isBulkUnit(item.unit)) {
-            // Jika unit bulk (bukan pcs)
-            price = item.product.retail_box_price;
-          } else if (item.unit === 'pcs' && 
-                     item.product.min_wholesale_qty > 0 && 
-                     item.quantity >= item.product.min_wholesale_qty) {
-            // Jika pcs dan memenuhi syarat grosir (hanya jika bukan reseller)
-            price = item.product.wholesale_price;
-          } else {
-            // Default ke harga eceran
-            price = item.product.retail_price;
-          }
-              
-          return {
-            ...item,
-            price,
-            subtotal: price * item.quantity
-          };
-        })
-      );
-    }
+    setCart(prevCart => {
+      if (prevCart.length === 0) {
+        return prevCart;
+      }
+
+      return prevCart.map(item => {
+        let price;
+
+        if (isReseller && item.product.reseller_price > 0) {
+          // Jika reseller dan ada harga reseller, selalu gunakan harga reseller
+          price = item.product.reseller_price;
+        } else if (isBulkUnit(item.unit)) {
+          // Jika unit bulk (bukan pcs)
+          price = item.product.retail_box_price;
+        } else if (
+          item.unit === 'pcs' &&
+          item.product.min_wholesale_qty > 0 &&
+          item.quantity >= item.product.min_wholesale_qty
+        ) {
+          // Jika pcs dan memenuhi syarat grosir (hanya jika bukan reseller)
+          price = item.product.wholesale_price;
+        } else {
+          // Default ke harga eceran
+          price = item.product.retail_price;
+        }
+
+        return {
+          ...item,
+          price,
+          subtotal: price * item.quantity
+        };
+      });
+    });
   }, [isReseller]);
 
   // Reset form to initial state
