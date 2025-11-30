@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { createClient } from '@/utils/supabase/server';
 import { NextResponse } from 'next/server';
 
 // GET by ID
@@ -8,7 +7,7 @@ export async function GET(request: Request, context: any) {
   const params = await context.params;
   const id = params?.id;
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const supabase = await createClient();
 
     const { data, error } = await supabase
       .from('product_codes')
@@ -35,7 +34,7 @@ export async function PUT(request: Request, context: any) {
   const params = await context.params;
   const id = params?.id;
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const supabase = await createClient();
     
     const { keyword, code_prefix, description } = await request.json();
 
@@ -82,7 +81,7 @@ export async function DELETE(request: Request, context: any) {
   const params = await context.params;
   const id = params?.id;
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const supabase = await createClient();
     
     const { error } = await supabase
       .from('product_codes')

@@ -1,5 +1,4 @@
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import type { Database } from '@/lib/database.types';
+import { createClient } from '@/utils/supabase/client';
 
 export interface TransactionItemPayload {
   product_id: string | number;   // Changed from number to string to match UUID
@@ -18,7 +17,7 @@ export interface CreateTransactionPayload {
 }
 
 export const createTransaction = async (payload: CreateTransactionPayload) => {
-  const supabase = createClientComponentClient<Database>();
+  const supabase = createClient();
   const { data: { session } } = await supabase.auth.getSession();
 
   if (!session) {

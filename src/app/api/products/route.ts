@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createClient } from '@/utils/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
-export async function GET(request: Request) {
+export const runtime = 'nodejs'
+
+export async function GET() {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from('products')
       .select('*')
@@ -28,7 +30,7 @@ export async function GET(request: Request) {
   }
 }
 
-async function generateProductId(supabase: any, prefix: string) {
+async function generateProductId(supabase: SupabaseClient, prefix: string) {
   
   // Find the latest product ID with this prefix
   const { data: latestProduct, error } = await supabase
@@ -60,7 +62,7 @@ async function generateProductId(supabase: any, prefix: string) {
 
 export async function POST(request: Request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const supabase = await createClient();
     
     // Parse and validate request body
     let productData;
@@ -77,28 +79,48 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validate required fields
-    if (!productData.name || !productData.category_id) {
+    // Debug: Log received data
+    console.log('Received product data:', JSON.stringify(productData, null, 2));
+    console.log('Name check:', productData.name, 'Category check:', productData.category);
+    
+    // Validate required fields - check for empty strings too
+    const nameValid = productData.name && productData.name.trim() !== '';
+    const categoryValid = productData.category && 
+                         productData.category !== '' && 
+                         productData.category !== '0' && 
+                         productData.category !== 0 &&
+                         !isNaN(Number(productData.category)) &&
+                         Number(productData.category) > 0;
+    
+    if (!nameValid || !categoryValid) {
+      console.log('Validation failed:');
+      console.log('- Name valid:', nameValid, '(value:', productData.name, ')');
+      console.log('- Category valid:', categoryValid, '(value:', productData.category, ', type:', typeof productData.category, ')');
       return NextResponse.json(
         { 
           error: 'Nama produk dan kategori harus diisi',
           missingFields: {
-            name: !productData.name,
-            category_id: !productData.category_id
+            name: !nameValid,
+            category: !categoryValid
           },
-          receivedData: productData // Debug: tampilkan data yang diterima
+          receivedData: productData,
+          debug: {
+            nameValue: productData.name,
+            categoryValue: productData.category,
+            categoryType: typeof productData.category
+          }
         },
         { status: 400 }
       );
     }
     
-    // Pastikan category_id adalah number
-    const categoryId = Number(productData.category_id);
+    // Pastikan category adalah number
+    const categoryId = Number(productData.category);
     if (isNaN(categoryId)) {
       return NextResponse.json(
         { 
           error: 'Format kategori tidak valid',
-          receivedCategoryId: productData.category_id
+          receivedCategory: productData.category
         },
         { status: 400 }
       );
@@ -125,7 +147,7 @@ export async function POST(request: Request) {
     console.log('Processing product data:', JSON.stringify(roundedData, null, 2));
     
     // Get category code prefix
-    console.log('Fetching category with ID:', productData.category_id);
+    console.log('Fetching category with ID:', productData.category);
     // Pastikan categoryId sudah di-convert ke number
     const { data: categoryData, error: categoryError } = await supabase
       .from('product_codes')
@@ -136,14 +158,14 @@ export async function POST(request: Request) {
     if (categoryError || !categoryData) {
       console.error('Error getting category:', {
         error: categoryError,
-        categoryId: productData.category_id,
+        categoryId: productData.category,
         timestamp: new Date().toISOString()
       });
       return NextResponse.json(
         { 
           error: 'Kategori tidak valid atau tidak ditemukan',
           details: categoryError?.message || 'Tidak ada detail error',
-          categoryId: productData.category_id
+          categoryId: productData.category
         },
         { status: 400 }
       );
@@ -168,6 +190,7 @@ export async function POST(request: Request) {
       .insert([{
         id: productId,
         name: roundedData.name,
+        category: categoryId,
         qty: roundedData.qty,
         cost_price: roundedData.cost_price,
         box_price: roundedData.box_price,
